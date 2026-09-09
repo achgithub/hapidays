@@ -108,7 +108,11 @@ func (s *Store) StoreCookies(host string, cookies []*http.Cookie) {
 func (s *Store) ListCookies() []model.CookieRecord {
 	cookieMu.Lock()
 	defer cookieMu.Unlock()
-	return s.loadCookieRecords()
+	records := s.loadCookieRecords()
+	if records == nil {
+		return []model.CookieRecord{} // never nil: encodes as JSON [], not null
+	}
+	return records
 }
 
 func (s *Store) ClearCookies() error {

@@ -116,7 +116,7 @@ func listDir[T any](dir string) ([]*T, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return []*T{}, nil // never nil: encodes as JSON [], not null, for list endpoints
 		}
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (s *Store) ListHistory() ([]model.HistoryEntry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return []model.HistoryEntry{}, nil // never nil: encodes as JSON [], not null
 		}
 		return nil, err
 	}

@@ -27,7 +27,7 @@ async function api(path, opts) {
 // ---------- collections / tree ----------
 
 async function loadCollections() {
-  state.collections = await api('/collections');
+  state.collections = (await api('/collections')) || [];
   renderCollectionList();
 }
 
@@ -474,7 +474,7 @@ async function saveCurrentRequest() {
 // ---------- environments ----------
 
 async function loadEnvironments() {
-  state.environments = await api('/environments');
+  state.environments = (await api('/environments')) || [];
   const sel = $('#envSelect');
   const prev = sel.value;
   sel.innerHTML = '<option value="">No environment</option>';
@@ -522,7 +522,7 @@ function openEnvEditor() {
 // ---------- history ----------
 
 async function loadHistory() {
-  const entries = await api('/history');
+  const entries = (await api('/history')) || [];
   const container = $('#historyList');
   container.innerHTML = '';
   entries.slice().reverse().slice(0, 100).forEach(h => {
