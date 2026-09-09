@@ -768,6 +768,13 @@ function escapeAttr(s) { return escapeHtml(s); }
 
 // ---------- wiring ----------
 
+// Catches any button handler that forgot its own try/catch around an
+// await api(...) call — without this, a rejected promise in an onclick
+// handler fails completely silently and just looks like "nothing happened".
+window.addEventListener('unhandledrejection', (e) => {
+  alert('Unexpected error: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;
@@ -785,9 +792,14 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#newCollectionBtn').onclick = async () => {
     const name = prompt('New collection name:');
     if (!name) return;
-    const id = crypto.randomUUID();
-    await api(`/collections/${id}`, { method: 'PUT', body: JSON.stringify({ id, name, root: [] }) });
-    await loadCollections();
+    try {
+      const id = crypto.randomUUID();
+      await api(`/collections/${id}`, { method: 'PUT', body: JSON.stringify({ id, name, root: [] }) });
+      await loadCollections();
+      await openCollection(id); // select it so it's visibly expanded, not just appended off-screen
+    } catch (e) {
+      alert('Failed to create collection: ' + e.message);
+    }
   };
 
   $('#envSelect').onchange = (e) => { state.currentEnvironmentId = e.target.value; };

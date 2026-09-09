@@ -35,10 +35,10 @@ type Store struct {
 }
 
 func New(dir string) (*Store, error) {
-	if err := os.MkdirAll(filepath.Join(dir, "collections"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "collections"), 0o700); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "environments"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "environments"), 0o700); err != nil {
 		return nil, err
 	}
 	return &Store{dir: dir}, nil
@@ -58,7 +58,7 @@ func (s *Store) writeJSON(path string, v any) error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)
@@ -176,7 +176,7 @@ func (s *Store) AppendHistory(entry model.HistoryEntry) error {
 		return err
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)

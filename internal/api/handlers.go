@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -73,17 +74,37 @@ func (s *Server) routes() {
 // Origin header that isn't our own loopback origin). Non-browser clients
 // (curl, no Origin header) are allowed through — they aren't the threat
 // model here, a hostile page open in the same browser is.
+//
+// r.Host is checked against a fixed loopback allowlist rather than trusted
+// as-is: a page on a hostile domain that DNS-resolves to 127.0.0.1 (DNS
+// rebinding) would otherwise make Origin and Host agree with each other
+// while both are the attacker's hostname, sailing straight through a
+// same-origin check that only compares them to one another.
 func (s *Server) originGuard(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackHost(r.Host) {
+			http.Error(w, "host not recognized as loopback", http.StatusForbidden)
+			return
+		}
 		origin := r.Header.Get("Origin")
-		if origin != "" {
-			host := r.Host
-			if !strings.HasSuffix(origin, "://"+host) {
-				http.Error(w, "cross-origin request rejected", http.StatusForbidden)
-				return
-			}
+		if origin != "" && origin != "http://"+r.Host && origin != "https://"+r.Host {
+			http.Error(w, "cross-origin request rejected", http.StatusForbidden)
+			return
 		}
 		next(w, r)
+	}
+}
+
+func isLoopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	switch strings.ToLower(host) {
+	case "127.0.0.1", "::1", "[::1]", "localhost":
+		return true
+	default:
+		return false
 	}
 }
 
