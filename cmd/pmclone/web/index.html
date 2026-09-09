@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pmclone</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <strong>pmclone</strong>
+      <div class="btn-row">
+        <button id="importCollectionBtn" title="Import Postman collection">Import</button>
+        <button id="newCollectionBtn" title="New empty collection">New</button>
+      </div>
+    </div>
+    <input id="importCollectionInput" type="file" accept=".json" hidden>
+    <div id="collectionList" class="collection-list"></div>
+
+    <div class="sidebar-header">
+      <strong>Environment</strong>
+      <div class="btn-row">
+        <button id="importEnvBtn" title="Import Postman environment">Import</button>
+        <button id="editEnvBtn" title="Edit variables">Edit</button>
+      </div>
+    </div>
+    <input id="importEnvInput" type="file" accept=".json" hidden>
+    <select id="envSelect"><option value="">No environment</option></select>
+
+    <div class="sidebar-header">
+      <strong>History</strong>
+    </div>
+    <div id="historyList" class="history-list"></div>
+
+    <div class="sidebar-footer">
+      <button id="cookiesBtn">Cookies</button>
+      <button id="settingsBtn">Settings</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="request-bar">
+      <select id="methodSelect">
+        <option>GET</option><option>POST</option><option>PUT</option>
+        <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+      </select>
+      <input id="urlInput" type="text" placeholder="https://api.example.com/path?{{var}}=1">
+      <button id="sendBtn">Send</button>
+      <button id="saveRequestBtn" title="Save changes back to the collection">Save</button>
+    </div>
+
+    <div class="tabs" id="requestTabs">
+      <button class="tab active" data-tab="params">Query Params</button>
+      <button class="tab" data-tab="headers">Headers</button>
+      <button class="tab" data-tab="auth">Auth</button>
+      <button class="tab" data-tab="body">Body</button>
+      <button class="tab" data-tab="script">Scripts</button>
+    </div>
+
+    <div class="tab-panel" id="panel-params">
+      <div id="paramsTable" class="kv-table"></div>
+      <button class="add-row" data-target="params">+ Add param</button>
+    </div>
+    <div class="tab-panel hidden" id="panel-headers">
+      <div id="headersTable" class="kv-table"></div>
+      <button class="add-row" data-target="headers">+ Add header</button>
+    </div>
+    <div class="tab-panel hidden" id="panel-auth">
+      <select id="authType">
+        <option value="inherit">Inherit from collection</option>
+        <option value="none">No Auth</option>
+        <option value="basic">Basic Auth</option>
+        <option value="digest">Digest Auth</option>
+        <option value="bearer">Bearer Token</option>
+        <option value="oauth2">OAuth 2.0</option>
+        <option value="apikey">API Key</option>
+        <option value="awsv4">AWS Signature (SigV4)</option>
+      </select>
+      <div id="authFields"></div>
+    </div>
+    <div class="tab-panel hidden" id="panel-body">
+      <select id="bodyMode">
+        <option value="none">None</option>
+        <option value="raw">Raw</option>
+        <option value="urlencoded">x-www-form-urlencoded</option>
+      </select>
+      <select id="bodyLanguage">
+        <option value="json">JSON</option>
+        <option value="xml">XML</option>
+        <option value="text">Text</option>
+      </select>
+      <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
+      <div id="bodyUrlEncodedTable" class="kv-table hidden"></div>
+    </div>
+    <div class="tab-panel hidden" id="panel-script">
+      <p class="hint">Imported Postman scripts are shown for reference only — pmclone does not execute JavaScript.
+      Use a Capture rule instead to pull a value out of the response into an environment variable (e.g. the
+      SAP/OData "X-CSRF-Token: Fetch" pattern).</p>
+      <label>Pre-request script (read-only)</label>
+      <textarea id="preScriptView" rows="4" readonly></textarea>
+      <label>Test script (read-only)</label>
+      <textarea id="testScriptView" rows="4" readonly></textarea>
+      <label>Captures</label>
+      <div id="capturesTable" class="kv-table"></div>
+      <div class="btn-row">
+        <button class="add-row" data-target="captures">+ Add capture</button>
+        <button id="suggestCapturesBtn" title="Scan the scripts above for common pm.environment.set(...) patterns">Suggest from script</button>
+      </div>
+    </div>
+
+    <div class="response-area">
+      <div class="response-status" id="responseStatus">No response yet</div>
+      <div class="tabs" id="responseTabs">
+        <button class="tab active" data-rtab="body">Body</button>
+        <button class="tab" data-rtab="headers">Headers</button>
+      </div>
+      <pre class="response-body" id="responseBody"></pre>
+      <div class="response-headers hidden" id="responseHeaders"></div>
+    </div>
+  </main>
+</div>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

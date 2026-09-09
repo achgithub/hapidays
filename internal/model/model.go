@@ -1,0 +1,148 @@
+// Package model holds the app's normalized data model. Postman's on-disk
+// format is polymorphic (see internal/postman); everything downstream of the
+// importer works against these plain, order-preserving types instead.
+package model
+
+import "time"
+
+type KV struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
+type AuthType string
+
+const (
+	AuthNone    AuthType = "none"
+	AuthBasic   AuthType = "basic"
+	AuthBearer  AuthType = "bearer"
+	AuthAPIKey  AuthType = "apikey"
+	AuthInherit AuthType = "inherit"
+	AuthDigest  AuthType = "digest"
+	AuthAWSSigV4 AuthType = "awsv4"
+	// AuthOAuth2 applies a bearer token the same way AuthBearer does; the
+	// token in Params["accessToken"] is fetched ahead of time via
+	// POST /api/oauth2/token (client_credentials/password/authorization_code)
+	// and cached on the request, not re-fetched on every send.
+	AuthOAuth2 AuthType = "oauth2"
+)
+
+type Auth struct {
+	Type AuthType `json:"type"`
+	// Params holds type-specific fields, e.g. basic: username/password,
+	// bearer: token, apikey: key/value/addTo ("header"|"query").
+	Params map[string]string `json:"params,omitempty"`
+}
+
+type BodyMode string
+
+const (
+	BodyNone       BodyMode = "none"
+	BodyRaw        BodyMode = "raw"
+	BodyURLEncoded BodyMode = "urlencoded"
+	BodyFormData   BodyMode = "formdata"
+	BodyGraphQL    BodyMode = "graphql"
+)
+
+type FormField struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Type     string `json:"type"` // "text" | "file"
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
+type Body struct {
+	Mode        BodyMode    `json:"mode"`
+	Raw         string      `json:"raw,omitempty"`
+	RawLanguage string      `json:"rawLanguage,omitempty"` // json|xml|text|html
+	URLEncoded  []KV        `json:"urlEncoded,omitempty"`
+	FormData    []FormField `json:"formData,omitempty"`
+}
+
+// Capture is our own (non-Postman) feature: after a response comes back,
+// pull a value out of it into an environment variable. Covers the common
+// "GET X-CSRF-Token: Fetch, then reuse it" pattern without needing a JS
+// engine to run Postman's pm.environment.set() scripts.
+type Capture struct {
+	Source string `json:"source"` // "header" | "body_json"
+	From   string `json:"from"`   // header name, or JSON path like "data.token"
+	IntoVar string `json:"intoVar"`
+}
+
+type RequestSpec struct {
+	Method  string    `json:"method"`
+	URLRaw  string    `json:"urlRaw"` // may contain {{vars}}; kept verbatim, not re-encoded
+	Query   []KV      `json:"query,omitempty"`
+	Headers []KV      `json:"headers,omitempty"`
+	Auth    Auth      `json:"auth"`
+	Body    Body      `json:"body"`
+	Captures []Capture `json:"captures,omitempty"`
+
+	// Raw scripts imported from Postman, kept for visibility but not
+	// executed (see internal/postman doc comment for why).
+	PreRequestScript string `json:"preRequestScript,omitempty"`
+	TestScript       string `json:"testScript,omitempty"`
+	HasScript        bool   `json:"hasScript,omitempty"`
+}
+
+// Node is either a folder (Children non-nil, Request nil) or a request leaf.
+type Node struct {
+	ID       string       `json:"id"`
+	Name     string       `json:"name"`
+	Children []*Node      `json:"children,omitempty"`
+	Request  *RequestSpec `json:"request,omitempty"`
+}
+
+type Collection struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Variables []KV      `json:"variables,omitempty"`
+	Auth      Auth      `json:"auth"` // collection-level default auth
+	Root      []*Node   `json:"root"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type Environment struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Values    []KV      `json:"values"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type HistoryEntry struct {
+	ID         string    `json:"id"`
+	Timestamp  time.Time `json:"timestamp"`
+	Method     string    `json:"method"`
+	URL        string    `json:"url"`
+	Status     int       `json:"status"`
+	DurationMS int64     `json:"durationMs"`
+	SizeBytes  int64     `json:"sizeBytes"`
+}
+
+// CookieRecord is one persisted cookie, matched against outgoing requests
+// by exact-or-subdomain match on Domain. Path-scoping isn't modeled — v1
+// sends a cookie to every path on a matching domain, which is broader than
+// browsers but fine for the session-cookie-on-one-API-host case this
+// exists for.
+type CookieRecord struct {
+	Domain   string    `json:"domain"`
+	Name     string    `json:"name"`
+	Value    string    `json:"value"`
+	Expires  time.Time `json:"expires,omitempty"`
+	Secure   bool      `json:"secure,omitempty"`
+	HTTPOnly bool      `json:"httpOnly,omitempty"`
+}
+
+// RunStepResult is one executed request within a collection run.
+type RunStepResult struct {
+	Iteration  int    `json:"iteration"`
+	NodeID     string  `json:"nodeId"`
+	Name       string  `json:"name"`
+	Method     string  `json:"method"`
+	URL        string  `json:"url"`
+	Status     int     `json:"status"`
+	DurationMS int64   `json:"durationMs"`
+	SizeBytes  int64   `json:"sizeBytes"`
+	Error      string  `json:"error,omitempty"`
+}
