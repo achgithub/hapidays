@@ -28,6 +28,11 @@
     </div>
     <input id="importEnvInput" type="file" accept=".json" hidden>
     <select id="envSelect"><option value="">No environment</option></select>
+    <select id="tlsOverrideSelect" title="Per-session override of the global TLS verification setting — applies to every send/run until changed">
+      <option value="">TLS: use global setting</option>
+      <option value="skip">TLS: skip verification (insecure)</option>
+      <option value="enforce">TLS: enforce verification</option>
+    </select>
 
     <div class="sidebar-header">
       <strong>History</strong>

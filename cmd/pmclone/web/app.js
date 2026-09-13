@@ -742,6 +742,17 @@ function collectFormIntoRequest() {
 
 // ---------- send ----------
 
+// Reads the sidebar's TLS override select. Backend fields (sendRequest/
+// runRequest's InsecureSkipVerify *bool) are session-scoped overrides,
+// not part of the saved RequestSpec — undefined here correctly omits the
+// field so the server falls back to the global Settings toggle.
+function currentInsecureSkipVerifyOverride() {
+  const v = $('#tlsOverrideSelect').value;
+  if (v === 'skip') return true;
+  if (v === 'enforce') return false;
+  return undefined;
+}
+
 async function sendRequest() {
   collectFormIntoRequest();
   $('#responseStatus').textContent = 'Sending…';
@@ -754,6 +765,7 @@ async function sendRequest() {
         request: currentRequest,
         collectionId: state.currentCollection ? state.currentCollection.id : '',
         environmentId: state.currentEnvironmentId,
+        insecureSkipVerify: currentInsecureSkipVerifyOverride(),
       }),
     });
     renderResponse(result);
@@ -947,6 +959,7 @@ function openRunModal(collectionId, folderId, label) {
           collectionId, folderId: folderId || undefined,
           environmentId: state.currentEnvironmentId,
           dataRows, delayMs: parseInt($('#runDelay').value, 10) || 0,
+          insecureSkipVerify: currentInsecureSkipVerifyOverride(),
         }),
       });
       renderRunResults(results);
@@ -1082,6 +1095,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
         body: JSON.stringify({
           request: req, collectionId, environmentId: state.currentEnvironmentId,
           extraVars: step.row || undefined,
+          insecureSkipVerify: currentInsecureSkipVerifyOverride(),
         }),
       });
       const ok = !result.error && result.status >= 200 && result.status < 400;
@@ -1147,6 +1161,18 @@ async function openCookiesModal() {
   showModal(`
     <h3>Cookie Jar</h3>
     <div id="cookiesTable" class="kv-table"></div>
+
+    <h4>Add a cookie</h4>
+    <p class="hint">Seed a cookie by hand — e.g. a session value you obtained some other way — rather than only ever accumulating them from responses.</p>
+    <div class="field-row"><label>Domain</label><input type="text" id="newCookieDomain" placeholder="api.example.com"></div>
+    <div class="field-row"><label>Name</label><input type="text" id="newCookieName" placeholder="session_id"></div>
+    <div class="field-row"><label>Value</label><input type="text" id="newCookieValue" placeholder="value"></div>
+    <div class="field-row">
+      <label><input type="checkbox" id="newCookieSecure"> Secure</label>
+      <label style="margin-left:12px"><input type="checkbox" id="newCookieHttpOnly"> HttpOnly</label>
+    </div>
+    <button id="cookieAdd">Add cookie</button>
+
     <div class="modal-actions">
       <button id="cookiesClear">Clear All</button>
       <button id="cookiesClose" style="background:var(--accent);color:#fff">Close</button>
@@ -1159,7 +1185,9 @@ async function openCookiesModal() {
     cookies.forEach(c => {
       const row = document.createElement('div');
       row.className = 'kv-row';
-      row.innerHTML = `<span style="flex:1">${escapeHtml(c.domain)} — ${escapeHtml(c.name)}=${escapeHtml(c.value)}</span>
+      const flags = [c.secure ? 'Secure' : null, c.httpOnly ? 'HttpOnly' : null].filter(Boolean).join(', ');
+      const expires = c.expires && !c.expires.startsWith('0001-01-01') ? ` · expires ${new Date(c.expires).toLocaleString()}` : '';
+      row.innerHTML = `<span style="flex:1">${escapeHtml(c.domain)} — ${escapeHtml(c.name)}=${escapeHtml(c.value)}${flags ? ' (' + flags + ')' : ''}${expires}</span>
         <button class="remove-row" title="Remove">×</button>`;
       row.querySelector('.remove-row').onclick = async () => {
         await api(`/cookies/${encodeURIComponent(c.domain)}/${encodeURIComponent(c.name)}`, { method: 'DELETE' });
@@ -1171,6 +1199,21 @@ async function openCookiesModal() {
   $('#cookiesClose').onclick = closeModal;
   $('#cookiesClear').onclick = async () => {
     await api('/cookies', { method: 'DELETE' });
+    openCookiesModal();
+  };
+  $('#cookieAdd').onclick = async () => {
+    const domain = $('#newCookieDomain').value.trim();
+    const name = $('#newCookieName').value.trim();
+    if (!domain || !name) { alert('Domain and name are required.'); return; }
+    await api('/cookies', {
+      method: 'PUT',
+      body: JSON.stringify({
+        domain, name,
+        value: $('#newCookieValue').value,
+        secure: $('#newCookieSecure').checked,
+        httpOnly: $('#newCookieHttpOnly').checked,
+      }),
+    });
     openCookiesModal();
   };
 }

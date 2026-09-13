@@ -105,6 +105,23 @@ func (s *Store) StoreCookies(host string, cookies []*http.Cookie) {
 	_ = s.saveCookieRecords(records)
 }
 
+// SetCookie upserts a single cookie record directly — the manual "add a
+// cookie" path from the UI, as opposed to StoreCookies, which persists
+// Set-Cookie results parsed off a real response.
+func (s *Store) SetCookie(rec model.CookieRecord) error {
+	cookieMu.Lock()
+	defer cookieMu.Unlock()
+	records := s.loadCookieRecords()
+	for i, r := range records {
+		if r.Domain == rec.Domain && r.Name == rec.Name {
+			records[i] = rec
+			return s.saveCookieRecords(records)
+		}
+	}
+	records = append(records, rec)
+	return s.saveCookieRecords(records)
+}
+
 func (s *Store) ListCookies() []model.CookieRecord {
 	cookieMu.Lock()
 	defer cookieMu.Unlock()

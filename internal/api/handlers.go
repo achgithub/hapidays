@@ -60,6 +60,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /api/settings", s.originGuard(s.saveSettings))
 
 	s.mux.HandleFunc("GET /api/cookies", s.originGuard(s.listCookies))
+	s.mux.HandleFunc("PUT /api/cookies", s.originGuard(s.setCookie))
 	s.mux.HandleFunc("DELETE /api/cookies", s.originGuard(s.clearCookies))
 	s.mux.HandleFunc("DELETE /api/cookies/{domain}/{name}", s.originGuard(s.deleteCookie))
 
@@ -399,6 +400,26 @@ func (s *Server) saveSettings(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listCookies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, s.store.ListCookies())
+}
+
+// setCookie is the manual "add a cookie" path — e.g. seeding a session
+// cookie value you obtained some other way, rather than only ever
+// accumulating cookies as a side effect of sending requests.
+func (s *Server) setCookie(w http.ResponseWriter, r *http.Request) {
+	var rec model.CookieRecord
+	if err := json.NewDecoder(r.Body).Decode(&rec); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if rec.Domain == "" || rec.Name == "" {
+		writeErr(w, 400, fmt.Errorf("domain and name are required"))
+		return
+	}
+	if err := s.store.SetCookie(rec); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	w.WriteHeader(204)
 }
 
 func (s *Server) clearCookies(w http.ResponseWriter, r *http.Request) {

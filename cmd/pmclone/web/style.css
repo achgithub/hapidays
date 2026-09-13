@@ -55,6 +55,7 @@ button, input, select, textarea { font-family: inherit; font-size: 13px; }
 .sidebar button:hover, .main button:hover { border-color: var(--accent); }
 #sendBtn { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; padding: 6px 18px; }
 #envSelect { margin: 0 12px 10px; }
+#tlsOverrideSelect { margin: 0 12px 10px; font-size: 12px; color: var(--text-dim); }
 
 .collection-list { padding: 0 6px; flex: 0 0 auto; max-height: 40vh; overflow-y: auto; }
 .tree-node { user-select: none; }
