@@ -760,11 +760,13 @@ function openRunModal(collectionId, folderId, label) {
       <input type="text" id="runDelay" value="0"></div>
     <div class="modal-actions">
       <button id="runCancel">Cancel</button>
+      <button id="runStep">Step through…</button>
       <button id="runStart" style="background:var(--accent);color:#fff">Run</button>
     </div>
     <div id="runResults"></div>
   `);
   $('#runCancel').onclick = closeModal;
+  $('#runStep').onclick = () => openStepModal(collectionId, folderId, label);
   $('#runStart').onclick = async () => {
     $('#runStart').disabled = true;
     $('#runStart').textContent = 'Running…';
@@ -810,6 +812,129 @@ function renderRunResults(results) {
     table.appendChild(row);
   });
   container.appendChild(table);
+}
+
+// ---------- step-through runner ----------
+
+// Depth-first leaf order, matching runner.go's flatten() exactly (folder
+// vs. request is told apart by `request` being present, not by `children`
+// being absent — an empty folder still has children:[], not children:null,
+// since the omitempty fix) so step-through and "Run" agree on order.
+function flattenNodesForStep(nodes) {
+  let out = [];
+  for (const n of nodes) {
+    if (n.request) out.push(n);
+    else if (n.children) out = out.concat(flattenNodesForStep(n.children));
+  }
+  return out;
+}
+
+function findNodeById(nodes, id) {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    if (n.children) {
+      const found = findNodeById(n.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+async function openStepModal(collectionId, folderId, label) {
+  // Fetched fresh rather than read off state.currentCollection: the ▶/Step
+  // icon on a collection row works even when that collection isn't the
+  // currently-open one.
+  const col = await api(`/collections/${collectionId}`);
+  const rootNodes = folderId ? (findNodeById(col.root, folderId)?.children || []) : col.root;
+  const steps = flattenNodesForStep(rootNodes);
+
+  showModal(`
+    <h3>Step through: ${escapeHtml(label)}</h3>
+    <p class="hint" id="stepProgress"></p>
+    <div id="stepLog"></div>
+    <div class="modal-actions">
+      <button id="stepStop">Stop</button>
+      <button id="stepRunToEnd">Run to end ⏩</button>
+      <button id="stepNext" style="background:var(--accent);color:#fff">Step ▶</button>
+    </div>
+  `);
+
+  if (steps.length === 0) {
+    $('#stepProgress').textContent = 'Nothing to step through — this folder has no requests.';
+    $('#stepNext').disabled = true;
+    $('#stepRunToEnd').disabled = true;
+    $('#stepStop').onclick = closeModal;
+    return;
+  }
+
+  let idx = 0;
+  let stopped = false;
+  const log = $('#stepLog');
+
+  const renderProgress = () => {
+    if (idx >= steps.length) {
+      $('#stepProgress').textContent = `Done — ${steps.length}/${steps.length} steps executed.`;
+      $('#stepNext').disabled = true;
+      $('#stepRunToEnd').disabled = true;
+      return;
+    }
+    const node = steps[idx];
+    $('#stepProgress').textContent = `Step ${idx + 1} of ${steps.length}: ${node.name}`;
+  };
+
+  // Runs steps[idx], appends an input+output card to the log, advances idx.
+  // Shared by "Step" (one call) and "Run to end" (called in a loop).
+  const runOneStep = async () => {
+    const node = steps[idx];
+    const req = node.request;
+    const card = document.createElement('div');
+    card.className = 'step-card';
+    card.innerHTML = `
+      <div class="step-card-title">${idx + 1}. ${escapeHtml(node.name)}</div>
+      <div class="step-card-input">→ ${escapeHtml(req.method)} ${escapeHtml(req.urlRaw)}${req.auth && req.auth.type && req.auth.type !== 'none' ? ' · auth: ' + escapeHtml(req.auth.type) : ''}${req.body && req.body.mode !== 'none' ? ' · body: ' + escapeHtml(req.body.mode) : ''}</div>
+      <div class="step-card-output">Sending…</div>
+    `;
+    log.appendChild(card);
+    card.scrollIntoView({ block: 'end' });
+
+    try {
+      const result = await api('/send', {
+        method: 'POST',
+        body: JSON.stringify({ request: req, collectionId, environmentId: state.currentEnvironmentId }),
+      });
+      const ok = !result.error && result.status >= 200 && result.status < 400;
+      const capturedText = result.captured && Object.keys(result.captured).length
+        ? `\ncaptured: ${JSON.stringify(result.captured)}` : '';
+      const bodyPreview = (result.body || '').slice(0, 500);
+      card.querySelector('.step-card-output').innerHTML = `
+        <span style="color:${ok ? 'var(--ok)' : 'var(--danger)'}">← ${escapeHtml(result.error || (result.status + ' ' + (result.statusText || '')))} · ${result.durationMs}ms${result.resolvedUrl ? ' · ' + escapeHtml(result.resolvedUrl) : ''}</span>
+        <pre>${escapeHtml(bodyPreview)}${capturedText ? escapeHtml(capturedText) : ''}</pre>
+      `;
+      if (result.captured && Object.keys(result.captured).length) await loadEnvironments();
+    } catch (e) {
+      card.querySelector('.step-card-output').innerHTML = `<span style="color:var(--danger)">← failed: ${escapeHtml(e.message)}</span>`;
+    }
+    idx++;
+    renderProgress();
+  };
+
+  renderProgress();
+  $('#stepNext').onclick = async () => {
+    if (idx >= steps.length) return;
+    $('#stepNext').disabled = true;
+    await runOneStep();
+    $('#stepNext').disabled = idx >= steps.length;
+  };
+  $('#stepRunToEnd').onclick = async () => {
+    $('#stepNext').disabled = true;
+    $('#stepRunToEnd').disabled = true;
+    while (idx < steps.length && !stopped) {
+      await runOneStep();
+    }
+  };
+  // "Stop" during a Run-to-end just halts the loop after the in-flight
+  // request finishes — the modal stays open showing the log so far.
+  $('#stepStop').onclick = () => { stopped = true; closeModal(); };
 }
 
 async function parseDataFile(file) {

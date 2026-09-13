@@ -36,6 +36,11 @@ type Result struct {
 	SizeBytes    int64               `json:"sizeBytes"`
 	Captured     map[string]string   `json:"captured,omitempty"`
 	Error        string              `json:"error,omitempty"`
+	// ResolvedURL is URLRaw with {{vars}} (and $guid/$timestamp/etc.)
+	// substituted — the only faithful way to show "what actually got sent"
+	// for callers (e.g. the step-through runner) that want to display it
+	// without re-implementing Resolve's dynamic-variable handling.
+	ResolvedURL string `json:"resolvedUrl,omitempty"`
 }
 
 var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -189,7 +194,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	start := time.Now()
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds()}, nil
+		return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL}, nil
 	}
 
 	if spec.Auth.Type == model.AuthDigest && resp.StatusCode == http.StatusUnauthorized {
@@ -199,7 +204,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 		if derr == nil && applyDigestAuth(digestReq, challenge, spec.Auth.Params, vars) {
 			resp, err = httpClient.Do(digestReq)
 			if err != nil {
-				return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds()}, nil
+				return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL}, nil
 			}
 		}
 	}
@@ -214,15 +219,16 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	respBody, readErr := io.ReadAll(resp.Body)
 	duration := time.Since(start).Milliseconds()
 	if readErr != nil {
-		return &Result{Error: readErr.Error(), Status: resp.StatusCode, DurationMS: duration}, nil
+		return &Result{Error: readErr.Error(), Status: resp.StatusCode, DurationMS: duration, ResolvedURL: rawURL}, nil
 	}
 
 	result := &Result{
-		Status:     resp.StatusCode,
-		StatusText: resp.Status,
-		Headers:    resp.Header,
-		DurationMS: duration,
-		SizeBytes:  int64(len(respBody)),
+		Status:      resp.StatusCode,
+		StatusText:  resp.Status,
+		Headers:     resp.Header,
+		DurationMS:  duration,
+		SizeBytes:   int64(len(respBody)),
+		ResolvedURL: rawURL,
 	}
 	if isPrintable(respBody) {
 		result.Body = string(respBody)
