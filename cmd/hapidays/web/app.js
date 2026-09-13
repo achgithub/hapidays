@@ -339,7 +339,7 @@ function blankRequest() {
     method: 'GET', urlRaw: '', query: [], headers: [],
     auth: { type: 'none', params: {} },
     body: { mode: 'none' },
-    captures: [], preRequestScript: '', testScript: '', hasScript: false,
+    captures: [], assertions: [], preRequestScript: '', testScript: '', hasScript: false,
   };
 }
 
@@ -440,6 +440,7 @@ function renderRequestForm() {
   renderKVTable('paramsTable', currentRequest.query || (currentRequest.query = []), refreshFullUrlPreview);
   renderKVTable('headersTable', currentRequest.headers || (currentRequest.headers = []));
   renderCapturesTable();
+  renderAssertionsTable();
 
   $('#authType').value = currentRequest.auth.type || 'none';
   renderAuthFields();
@@ -502,6 +503,69 @@ function renderCapturesTable() {
     row.querySelector('.remove-row').onclick = () => { list.splice(i, 1); renderCapturesTable(); };
     container.appendChild(row);
   });
+}
+
+const ASSERTION_TYPES = [
+  { value: 'status_equals', label: 'Status equals', needsTarget: false, needsExpected: true, expectedPlaceholder: '200' },
+  { value: 'status_range', label: 'Status in range', needsTarget: false, needsExpected: true, expectedPlaceholder: '2xx' },
+  { value: 'header_exists', label: 'Header exists', needsTarget: true, needsExpected: false, targetPlaceholder: 'Header name' },
+  { value: 'header_equals', label: 'Header equals', needsTarget: true, needsExpected: true, targetPlaceholder: 'Header name', expectedPlaceholder: 'Value' },
+  { value: 'body_contains', label: 'Body contains', needsTarget: false, needsExpected: true, expectedPlaceholder: 'substring' },
+  { value: 'json_path_exists', label: 'JSON path exists', needsTarget: true, needsExpected: false, targetPlaceholder: 'data.token' },
+  { value: 'json_path_equals', label: 'JSON path equals', needsTarget: true, needsExpected: true, targetPlaceholder: 'data.token', expectedPlaceholder: 'Value' },
+  { value: 'max_duration_ms', label: 'Max duration (ms)', needsTarget: false, needsExpected: true, expectedPlaceholder: '2000' },
+];
+
+function renderAssertionsTable() {
+  const container = $('#assertionsTable');
+  const list = currentRequest.assertions || (currentRequest.assertions = []);
+  container.innerHTML = '';
+  list.forEach((a, i) => {
+    const meta = ASSERTION_TYPES.find(t => t.value === a.type) || ASSERTION_TYPES[0];
+    const row = document.createElement('div');
+    row.className = 'kv-row';
+    row.innerHTML = `
+      <input type="checkbox" ${a.disabled ? '' : 'checked'} title="Enabled">
+      <select style="flex:0 0 150px">
+        ${ASSERTION_TYPES.map(t => `<option value="${t.value}" ${t.value === a.type ? 'selected' : ''}>${t.label}</option>`).join('')}
+      </select>
+      <input type="text" class="assert-target" placeholder="${meta.targetPlaceholder || ''}" value="${escapeAttr(a.target || '')}" ${meta.needsTarget ? '' : 'disabled'}>
+      <input type="text" class="assert-expected" placeholder="${meta.expectedPlaceholder || ''}" value="${escapeAttr(a.expected || '')}" ${meta.needsExpected ? '' : 'disabled'}>
+      <button class="remove-row" title="Remove">×</button>`;
+    const chk = row.querySelector('input[type=checkbox]');
+    const sel = row.querySelector('select');
+    const targetInput = row.querySelector('.assert-target');
+    const expectedInput = row.querySelector('.assert-expected');
+    chk.onchange = () => { a.disabled = !chk.checked; };
+    sel.onchange = () => {
+      a.type = sel.value;
+      const newMeta = ASSERTION_TYPES.find(t => t.value === a.type);
+      if (!newMeta.needsTarget) a.target = '';
+      if (!newMeta.needsExpected) a.expected = '';
+      renderAssertionsTable();
+    };
+    targetInput.oninput = () => { a.target = targetInput.value; };
+    expectedInput.oninput = () => { a.expected = expectedInput.value; };
+    row.querySelector('.remove-row').onclick = () => { list.splice(i, 1); renderAssertionsTable(); };
+    container.appendChild(row);
+  });
+}
+
+function renderAssertionSummary(assertions) {
+  const el = $('#assertionSummary');
+  if (!assertions || assertions.length === 0) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  const passed = assertions.filter(a => a.passed).length;
+  const allPassed = passed === assertions.length;
+  el.classList.remove('hidden');
+  el.className = allPassed ? 'assertion-summary assertion-pass' : 'assertion-summary assertion-fail';
+  el.innerHTML = `<strong>${passed}/${assertions.length} assertions passed</strong>` +
+    '<ul>' + assertions.map(a =>
+      `<li class="${a.passed ? 'assertion-pass' : 'assertion-fail'}">${a.passed ? '✓' : '✗'} ${escapeHtml(a.message || a.type)}</li>`
+    ).join('') + '</ul>';
 }
 
 // Best-effort scan of imported Postman scripts for the handful of
@@ -841,8 +905,10 @@ function renderResponse(result) {
     $('#responseStatus').textContent = `Error: ${result.error} (${result.durationMs}ms)`;
     $('#responseStatus').className = 'response-status status-err';
     $('#responseBody').textContent = '';
+    renderAssertionSummary(null);
     return;
   }
+  renderAssertionSummary(result.assertions);
   const fault = !result.bodyIsBase64 ? detectSoapFault(result.body) : null;
   const statusClass = fault ? 'status-err' : 'status-' + Math.floor(result.status / 100);
   $('#responseStatus').className = 'response-status ' + statusClass;
@@ -1055,19 +1121,27 @@ function openRunModal(collectionId, folderId, label) {
 }
 
 function renderRunResults(results) {
-  const passCount = results.filter(r => !r.error && r.status >= 200 && r.status < 400).length;
+  // A step counts as passed only if it got a 2xx/3xx AND every enabled
+  // assertion on it passed — a request with a healthy status but a failed
+  // assertion (wrong body shape, missing header) is still a failed step.
+  const stepOk = (r) => !r.error && r.status >= 200 && r.status < 400 && r.assertionsPassed !== false;
+  const passCount = results.filter(stepOk).length;
+  const anyAssertions = results.some(r => r.assertions && r.assertions.length > 0);
   const container = $('#runResults');
   container.innerHTML = '';
   const summary = document.createElement('p');
-  summary.textContent = `${passCount}/${results.length} passed (2xx/3xx, no transport error)`;
+  summary.textContent = `${passCount}/${results.length} passed (2xx/3xx, no transport error${anyAssertions ? ', all assertions' : ''})`;
   container.appendChild(summary);
   const table = document.createElement('div');
   table.className = 'kv-table';
   results.forEach(r => {
     const row = document.createElement('div');
     row.className = 'kv-row';
-    const ok = !r.error && r.status >= 200 && r.status < 400;
-    row.innerHTML = `<span style="flex:1;color:${ok ? 'var(--ok)' : 'var(--danger)'}">${escapeHtml(String(r.iteration))} · ${escapeHtml(r.method)} ${escapeHtml(r.error || String(r.status))} · ${r.durationMs}ms · ${escapeHtml(r.name)}</span>`;
+    const ok = stepOk(r);
+    const assertBadge = r.assertions && r.assertions.length
+      ? ` · assertions ${r.assertions.filter(a => a.passed).length}/${r.assertions.length}`
+      : '';
+    row.innerHTML = `<span style="flex:1;color:${ok ? 'var(--ok)' : 'var(--danger)'}">${escapeHtml(String(r.iteration))} · ${escapeHtml(r.method)} ${escapeHtml(r.error || String(r.status))} · ${r.durationMs}ms · ${escapeHtml(r.name)}${assertBadge}</span>`;
     table.appendChild(row);
   });
   container.appendChild(table);
@@ -1180,13 +1254,16 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
           insecureSkipVerify: currentInsecureSkipVerifyOverride(),
         }),
       });
-      const ok = !result.error && result.status >= 200 && result.status < 400;
+      const assertionsPassed = !result.assertions || result.assertions.every(a => a.passed);
+      const ok = !result.error && result.status >= 200 && result.status < 400 && assertionsPassed;
       const capturedText = result.captured && Object.keys(result.captured).length
         ? `\ncaptured: ${JSON.stringify(result.captured)}` : '';
+      const assertionText = result.assertions && result.assertions.length
+        ? '\n' + result.assertions.map(a => `${a.passed ? '✓' : '✗'} ${a.message}`).join('\n') : '';
       const bodyPreview = (result.body || '').slice(0, 500);
       card.querySelector('.step-card-output').innerHTML = `
         <span style="color:${ok ? 'var(--ok)' : 'var(--danger)'}">← ${escapeHtml(result.error || (result.status + ' ' + (result.statusText || '')))} · ${result.durationMs}ms${result.resolvedUrl ? ' · ' + escapeHtml(result.resolvedUrl) : ''}</span>
-        <pre>${escapeHtml(bodyPreview)}${capturedText ? escapeHtml(capturedText) : ''}</pre>
+        <pre>${escapeHtml(bodyPreview)}${capturedText ? escapeHtml(capturedText) : ''}${assertionText ? escapeHtml(assertionText) : ''}</pre>
       `;
       if (result.captured && Object.keys(result.captured).length) await loadEnvironments();
     } catch (e) {
@@ -1643,6 +1720,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target === 'params') { currentRequest.query.push({ key: '', value: '', disabled: false }); renderKVTable('paramsTable', currentRequest.query, refreshFullUrlPreview); }
       if (target === 'headers') { currentRequest.headers.push({ key: '', value: '', disabled: false }); renderKVTable('headersTable', currentRequest.headers); }
       if (target === 'captures') { currentRequest.captures.push({ source: 'header', from: '', intoVar: '' }); renderCapturesTable(); }
+      if (target === 'assertions') { currentRequest.assertions.push({ type: 'status_equals', target: '', expected: '200', disabled: false }); renderAssertionsTable(); }
       if (target === 'urlencoded') {
         const list = currentRequest.body.urlEncoded || (currentRequest.body.urlEncoded = []);
         list.push({ key: '', value: '', disabled: false });

@@ -73,6 +73,7 @@
       <button class="tab" data-tab="auth">Auth</button>
       <button class="tab" data-tab="body">Body</button>
       <button class="tab" data-tab="script">Scripts</button>
+      <button class="tab" data-tab="assertions">Assertions</button>
     </div>
 
     <div class="tab-panel" id="panel-params">
@@ -169,8 +170,17 @@
       </div>
     </div>
 
+    <div class="tab-panel hidden" id="panel-assertions">
+      <p class="hint">Pass/fail checks evaluated after the response comes back — no JS engine, same reasoning as Captures.
+      Shown against a single Send, and aggregated into a pass/fail count when this request runs as part of a
+      collection run.</p>
+      <div id="assertionsTable" class="kv-table"></div>
+      <button class="add-row" data-target="assertions">+ Add assertion</button>
+    </div>
+
     <div class="response-area">
       <div class="response-status" id="responseStatus">No response yet</div>
+      <div id="assertionSummary" class="hidden"></div>
       <div class="tabs" id="responseTabs">
         <button class="tab active" data-rtab="body">Body</button>
         <button class="tab" data-rtab="headers">Headers</button>

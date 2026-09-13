@@ -18,6 +18,7 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"regexp"
@@ -47,6 +48,7 @@ type Result struct {
 	// for callers (e.g. the step-through runner) that want to display it
 	// without re-implementing Resolve's dynamic-variable handling.
 	ResolvedURL string `json:"resolvedUrl,omitempty"`
+	Assertions  []model.AssertionResult `json:"assertions,omitempty"`
 }
 
 var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -245,6 +247,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	}
 
 	result.Captured = applyCaptures(spec.Captures, resp.Header, respBody)
+	result.Assertions = applyAssertions(spec.Assertions, result, resp.Header, respBody)
 	return result, nil
 }
 
@@ -624,6 +627,87 @@ func applyCaptures(captures []model.Capture, headers http.Header, body []byte) m
 		}
 	}
 	return out
+}
+
+// applyAssertions evaluates each Assertion against the response and returns
+// one AssertionResult per enabled assertion, in order. Never returns an
+// error — an assertion that can't be evaluated (e.g. json_path_equals
+// against a non-JSON body) fails with a message explaining why, the same
+// as any other unmet assertion, rather than aborting the whole response.
+func applyAssertions(assertions []model.Assertion, result *Result, headers http.Header, body []byte) []model.AssertionResult {
+	if len(assertions) == 0 {
+		return nil
+	}
+	var jsonBody any
+	jsonErr := json.Unmarshal(body, &jsonBody)
+
+	out := make([]model.AssertionResult, 0, len(assertions))
+	for _, a := range assertions {
+		if a.Disabled {
+			continue
+		}
+		r := model.AssertionResult{Assertion: a}
+		switch a.Type {
+		case model.AssertStatusEquals:
+			want := a.Expected
+			got := strconv.Itoa(result.Status)
+			r.Passed = got == want
+			r.Message = fmt.Sprintf("status %s (expected %s)", got, want)
+		case model.AssertStatusRange:
+			r.Passed = statusInRange(result.Status, a.Expected)
+			r.Message = fmt.Sprintf("status %d (expected %s)", result.Status, a.Expected)
+		case model.AssertHeaderExists:
+			_, ok := headers[textproto.CanonicalMIMEHeaderKey(a.Target)]
+			r.Passed = ok
+			r.Message = fmt.Sprintf("header %q present: %v", a.Target, ok)
+		case model.AssertHeaderEquals:
+			got := headers.Get(a.Target)
+			r.Passed = got == a.Expected
+			r.Message = fmt.Sprintf("header %q = %q (expected %q)", a.Target, got, a.Expected)
+		case model.AssertBodyContains:
+			r.Passed = strings.Contains(string(body), a.Expected)
+			r.Message = fmt.Sprintf("body contains %q: %v", a.Expected, r.Passed)
+		case model.AssertJSONPathExists:
+			if jsonErr != nil {
+				r.Message = "response body is not valid JSON: " + jsonErr.Error()
+				break
+			}
+			_, ok := jsonPathLookup(jsonBody, a.Target)
+			r.Passed = ok
+			r.Message = fmt.Sprintf("json path %q present: %v", a.Target, ok)
+		case model.AssertJSONPathEquals:
+			if jsonErr != nil {
+				r.Message = "response body is not valid JSON: " + jsonErr.Error()
+				break
+			}
+			v, ok := jsonPathLookup(jsonBody, a.Target)
+			got := ""
+			if ok {
+				got = fmt.Sprintf("%v", v)
+			}
+			r.Passed = ok && got == a.Expected
+			r.Message = fmt.Sprintf("json path %q = %q (expected %q)", a.Target, got, a.Expected)
+		case model.AssertMaxDurationMS:
+			maxMS, err := strconv.ParseInt(a.Expected, 10, 64)
+			if err != nil {
+				r.Message = "invalid max_duration_ms expected value: " + a.Expected
+				break
+			}
+			r.Passed = result.DurationMS <= maxMS
+			r.Message = fmt.Sprintf("took %dms (max %dms)", result.DurationMS, maxMS)
+		default:
+			r.Message = "unknown assertion type: " + a.Type
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+func statusInRange(status int, rangeSpec string) bool {
+	if len(rangeSpec) != 3 || rangeSpec[1] != 'x' || rangeSpec[2] != 'x' {
+		return false
+	}
+	return status/100 == int(rangeSpec[0]-'0')
 }
 
 // jsonPathLookup resolves a dotted path like "data.token" against decoded JSON.

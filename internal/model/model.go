@@ -87,6 +87,42 @@ type Capture struct {
 	IntoVar string `json:"intoVar"`
 }
 
+// Assertion is our own (non-Postman) feature: a pass/fail check against a
+// response, evaluated without a JS engine (the same reasoning as Capture —
+// see the doc comment on RequestSpec.PreRequestScript). This is what turns
+// the collection runner from "replays requests and shows you the
+// responses" into something that can actually say a run passed or failed.
+type Assertion struct {
+	Type string `json:"type"` // see AssertXxx constants below
+	// Target's meaning depends on Type: a header name for
+	// header_equals/header_exists, a dotted JSON path for
+	// json_path_equals/json_path_exists (e.g. "data.token"), unused
+	// otherwise.
+	Target   string `json:"target,omitempty"`
+	Expected string `json:"expected,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
+const (
+	AssertStatusEquals    = "status_equals"     // Expected: exact status code, e.g. "200"
+	AssertStatusRange     = "status_range"      // Expected: "2xx" | "3xx" | "4xx" | "5xx"
+	AssertHeaderEquals    = "header_equals"      // Target: header name; Expected: exact value
+	AssertHeaderExists    = "header_exists"      // Target: header name
+	AssertBodyContains    = "body_contains"      // Expected: substring
+	AssertJSONPathEquals  = "json_path_equals"   // Target: dotted path; Expected: string form of the value
+	AssertJSONPathExists  = "json_path_exists"   // Target: dotted path
+	AssertMaxDurationMS   = "max_duration_ms"    // Expected: integer milliseconds
+)
+
+// AssertionResult is one evaluated Assertion, returned alongside a Result
+// so callers (the single-send response pane, the collection runner, the
+// step-through view) can all render the same pass/fail shape.
+type AssertionResult struct {
+	Assertion
+	Passed  bool   `json:"passed"`
+	Message string `json:"message"` // human-readable actual-vs-expected, populated on failure (and on pass, briefly)
+}
+
 type RequestSpec struct {
 	Method  string    `json:"method"`
 	URLRaw  string    `json:"urlRaw"` // may contain {{vars}}; kept verbatim, not re-encoded
@@ -95,6 +131,7 @@ type RequestSpec struct {
 	Auth    Auth      `json:"auth"`
 	Body    Body      `json:"body"`
 	Captures []Capture `json:"captures,omitempty"`
+	Assertions []Assertion `json:"assertions,omitempty"`
 
 	// Raw scripts imported from Postman, kept for visibility but not
 	// executed (see internal/importer doc comment for why).
@@ -186,4 +223,9 @@ type RunStepResult struct {
 	DurationMS int64   `json:"durationMs"`
 	SizeBytes  int64   `json:"sizeBytes"`
 	Error      string  `json:"error,omitempty"`
+	Assertions []AssertionResult `json:"assertions,omitempty"`
+	// AssertionsPassed is false if any enabled assertion on this step
+	// failed — surfaced separately from Assertions so the runner UI can
+	// show a single pass/fail badge per step without re-deriving it.
+	AssertionsPassed bool `json:"assertionsPassed"`
 }

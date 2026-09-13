@@ -51,6 +51,7 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 				Method:    node.Request.Method,
 				URL:       client.Resolve(node.Request.URLRaw, vars),
 			}
+			step.AssertionsPassed = true
 			result, err := client.Execute(ctx, *node.Request, vars, opts.Client)
 			switch {
 			case err != nil:
@@ -62,6 +63,13 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 				step.Status = result.Status
 				step.DurationMS = result.DurationMS
 				step.SizeBytes = result.SizeBytes
+				step.Assertions = result.Assertions
+				for _, a := range result.Assertions {
+					if !a.Passed {
+						step.AssertionsPassed = false
+						break
+					}
+				}
 			}
 			results = append(results, step)
 
