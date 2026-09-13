@@ -9,207 +9,274 @@
 <body>
 <div id="app">
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <strong>hapidays</strong>
-      <div class="btn-row">
-        <button id="importCollectionBtn" title="Import Postman collection">Import</button>
-        <button id="importWsdlBtn" title="Import a WSDL (upload a file or fetch by URL)">Import WSDL</button>
-        <button id="importODataBtn" title="Import an OData service from its $metadata URL">Import OData</button>
-        <button id="importGraphQLBtn" title="Import a GraphQL API via schema introspection">Import GraphQL</button>
-        <button id="importGRPCBtn" title="Import a gRPC service via server reflection (unary methods only)">Import gRPC</button>
-        <button id="importCurlBtn" title="Paste a curl command (e.g. browser devtools' Copy as cURL) to create a request">Import cURL</button>
-        <button id="newCollectionBtn" title="New empty collection">New</button>
+    <div class="brand-row">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-name">hapidays</div>
+      <div class="spacer"></div>
+      <button id="cookiesBtn" class="icon-btn" title="Cookie jar" aria-label="Cookie jar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1"/><circle cx="14" cy="8" r="1"/><circle cx="15" cy="14" r="1"/></svg>
+      </button>
+      <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings" style="position:relative">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/></svg>
+        <span id="tlsWarnDot" class="warn-dot hidden" title="TLS verification is overridden to skip for this session"></span>
+      </button>
+    </div>
+
+    <div class="search-row">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="treeSearchInput" type="text" placeholder="Filter this tree…" title="Filters requests currently visible in the tree below. Press ⌘K to search everything, including collapsed folders and other collections.">
+      </div>
+      <button class="icon-btn" id="paletteOpenBtn" title="Search everything (⌘K)" aria-label="Search everything">
+        <span class="kbd">⌘K</span>
+      </button>
+      <div class="new-menu">
+        <button class="new-btn" id="newBtn" aria-haspopup="true" aria-expanded="false">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          New
+        </button>
+        <div class="new-dropdown hidden" id="newDropdown">
+          <div class="grp-label">Create (in the open collection)</div>
+          <button type="button" id="newReqMenuItem">New request</button>
+          <button type="button" id="newFolderMenuItem">New folder</button>
+          <button type="button" id="newCollectionBtn">New collection</button>
+          <hr>
+          <div class="grp-label">Import</div>
+          <button type="button" id="importCollectionBtn"><span class="proto-dot dot-http"></span>Postman collection</button>
+          <button type="button" id="importWsdlBtn"><span class="proto-dot dot-soap"></span>WSDL (SOAP)</button>
+          <button type="button" id="importODataBtn"><span class="proto-dot dot-odata"></span>OData $metadata</button>
+          <button type="button" id="importGraphQLBtn"><span class="proto-dot dot-graphql"></span>GraphQL introspection</button>
+          <button type="button" id="importGRPCBtn"><span class="proto-dot dot-grpc"></span>gRPC (server reflection)</button>
+          <button type="button" id="importCurlBtn"><span class="proto-dot"></span>Paste a cURL command</button>
+        </div>
       </div>
     </div>
     <input id="importCollectionInput" type="file" accept=".json" hidden>
-    <div id="collectionList" class="collection-list"></div>
 
-    <div class="sidebar-header">
-      <strong>Environment</strong>
-      <div class="btn-row">
-        <button id="importEnvBtn" title="Import Postman environment">Import</button>
-        <button id="editEnvBtn" title="Edit variables">Edit</button>
+    <div class="sidebar-tabs" role="tablist" aria-label="Sidebar view">
+      <button class="sidebar-tab active" id="sidebarTabCollections" role="tab" aria-selected="true">Collections</button>
+      <button class="sidebar-tab" id="sidebarTabHistory" role="tab" aria-selected="false">History</button>
+    </div>
+
+    <div class="tree-scroll">
+      <div id="collectionList" class="collection-list"></div>
+      <div id="historyList" class="history-list hidden"></div>
+    </div>
+
+    <div class="util-rail">
+      <div class="util-row-label">
+        <span>Environment</span>
+        <div class="btn-row">
+          <button id="importEnvBtn" class="text-link" title="Import Postman environment">Import</button>
+        </div>
       </div>
-    </div>
-    <input id="importEnvInput" type="file" accept=".json" hidden>
-    <select id="envSelect"><option value="">No environment</option></select>
-    <select id="tlsOverrideSelect" title="Per-session override of the global TLS verification setting — applies to every send/run until changed">
-      <option value="">TLS: use global setting</option>
-      <option value="skip">TLS: skip verification (insecure)</option>
-      <option value="enforce">TLS: enforce verification</option>
-    </select>
-
-    <div class="sidebar-header">
-      <strong>History</strong>
-    </div>
-    <div id="historyList" class="history-list"></div>
-
-    <div class="sidebar-footer">
-      <button id="cookiesBtn">Cookies</button>
-      <button id="settingsBtn">Settings</button>
+      <input id="importEnvInput" type="file" accept=".json" hidden>
+      <div class="env-row">
+        <select id="envSelect" class="env-select"><option value="">No environment</option></select>
+        <button id="editEnvBtn" class="icon-btn bordered" title="Edit variables" aria-label="Edit environment variables">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+      </div>
     </div>
   </aside>
 
   <main class="main">
-    <div class="request-bar">
-      <div id="httpUrlBar" class="url-bar">
-        <select id="methodSelect">
-          <option>GET</option><option>POST</option><option>PUT</option>
-          <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
-        </select>
-        <select id="protocolSelect" title="Disabled when Domain is a {{variable}} — assumed to already include the scheme">
-          <option value="https">https://</option>
-          <option value="http">http://</option>
-        </select>
-        <input id="domainInput" type="text" placeholder="api.example.com or {{baseUrl}}">
-        <input id="portInput" type="text" placeholder="port">
-        <input id="pathInput" type="text" placeholder="/v1/resource">
-      </div>
-      <div id="grpcUrlBar" class="url-bar hidden">
-        <span class="hint">gRPC target and method are set in the Body tab.</span>
-      </div>
-      <button id="sendBtn">Send</button>
-      <button id="saveRequestBtn" title="Save changes back to the collection">Save</button>
-      <button id="copyAsCurlBtn" title="Show this request as a curl command">cURL</button>
-    </div>
-    <div class="full-url-preview" id="fullUrlPreview"></div>
-
-    <div class="tabs" id="requestTabs">
-      <button class="tab active" data-tab="params">Query Params</button>
-      <button class="tab" data-tab="headers">Headers</button>
-      <button class="tab" data-tab="auth">Auth</button>
-      <button class="tab" data-tab="body">Body</button>
-      <button class="tab" data-tab="script">Scripts</button>
-      <button class="tab" data-tab="assertions">Assertions</button>
+    <div class="crumb-bar" id="crumbBar">
+      <span id="crumbText">No request selected</span>
+      <span class="dirty-dot hidden" id="dirtyDot" title="Unsaved changes"></span>
     </div>
 
-    <div class="tab-panel" id="panel-params">
-      <div id="paramsTable" class="kv-table"></div>
-      <button class="add-row" data-target="params">+ Add param</button>
-    </div>
-    <div class="tab-panel hidden" id="panel-headers">
-      <div id="headersTable" class="kv-table"></div>
-      <button class="add-row" data-target="headers">+ Add header</button>
-    </div>
-    <div class="tab-panel hidden" id="panel-auth">
-      <select id="authType">
-        <option value="inherit">Inherit from collection</option>
-        <option value="none">No Auth</option>
-        <option value="basic">Basic Auth</option>
-        <option value="digest">Digest Auth</option>
-        <option value="bearer">Bearer Token</option>
-        <option value="oauth2">OAuth 2.0</option>
-        <option value="apikey">API Key</option>
-        <option value="awsv4">AWS Signature (SigV4)</option>
-      </select>
-      <div id="authFields"></div>
-    </div>
-    <div class="tab-panel hidden" id="panel-body">
-      <select id="bodyMode">
-        <option value="none">None</option>
-        <option value="raw">Raw</option>
-        <option value="urlencoded">x-www-form-urlencoded</option>
-        <option value="formdata">Form Data</option>
-        <option value="graphql">GraphQL</option>
-        <option value="soap">SOAP</option>
-        <option value="grpc">gRPC</option>
-      </select>
-      <select id="bodyLanguage">
-        <option value="json">JSON</option>
-        <option value="xml">XML</option>
-        <option value="text">Text</option>
-      </select>
-      <div id="soapFields" class="hidden">
-        <div class="field-row">
-          <label>SOAP Version</label>
-          <select id="soapVersion">
-            <option value="1.1">1.1 (SOAPAction header)</option>
-            <option value="1.2">1.2 (action in Content-Type)</option>
-          </select>
+    <div id="requestWorkspace">
+      <div class="request-head">
+        <div class="proto-switch" role="tablist" aria-label="Request type" id="protoSwitch">
+          <button class="proto-opt" data-p="http" role="tab" aria-selected="true"><span class="dot dot-http"></span>HTTP</button>
+          <button class="proto-opt" data-p="graphql" role="tab" aria-selected="false"><span class="dot dot-graphql"></span>GraphQL</button>
+          <button class="proto-opt" data-p="soap" role="tab" aria-selected="false"><span class="dot dot-soap"></span>SOAP</button>
+          <button class="proto-opt" data-p="grpc" role="tab" aria-selected="false"><span class="dot dot-grpc"></span>gRPC</button>
+          <button class="proto-opt" data-p="odata" role="tab" aria-selected="false"><span class="dot dot-odata"></span>OData</button>
         </div>
-        <div class="field-row">
-          <label>SOAPAction</label>
-          <input type="text" id="soapAction" placeholder="http://tempuri.org/Add">
+
+        <div class="req-bar">
+          <div id="httpUrlBar" class="url-bar">
+            <select id="methodSelect">
+              <option>GET</option><option>POST</option><option>PUT</option>
+              <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+            </select>
+            <select id="protocolSelect" title="Disabled when Domain is a {{variable}} — assumed to already include the scheme">
+              <option value="https">https://</option>
+              <option value="http">http://</option>
+            </select>
+            <input id="domainInput" class="req-bar-input" type="text" placeholder="api.example.com or {{baseUrl}}">
+            <input id="portInput" class="req-bar-input port" type="text" placeholder="port">
+            <input id="pathInput" class="req-bar-input" type="text" placeholder="/v1/resource">
+          </div>
+          <div id="grpcUrlBar" class="url-bar hidden">
+            <span class="hint">gRPC target and method are set in the Body tab.</span>
+          </div>
+          <button id="sendBtn" class="send-btn" title="Send (⌘⏎)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 11 21 3l-7 18-3-8-8-2Z"/></svg>
+            Send
+          </button>
+          <button id="saveRequestBtn" class="icon-only-btn" title="Save changes back to the collection (⌘S)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 4h11l3 3v13H5Z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+          </button>
+          <button id="copyAsCurlBtn" class="icon-only-btn" title="Show this request as a curl command">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M13 6l-2 12"/></svg>
+          </button>
         </div>
+        <div class="full-url-preview" id="fullUrlPreview"></div>
+      </div>
+
+      <div class="tabs" id="requestTabs" role="tablist">
+        <button class="tab active" data-tab="params" role="tab" aria-selected="true">Params</button>
+        <button class="tab" data-tab="headers" role="tab" aria-selected="false">Headers</button>
+        <button class="tab" data-tab="auth" role="tab" aria-selected="false">
+          <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          Auth
+        </button>
+        <button class="tab" data-tab="body" role="tab" aria-selected="false">Body</button>
+        <button class="tab" data-tab="script" role="tab" aria-selected="false">Scripts</button>
+        <button class="tab" data-tab="assertions" role="tab" aria-selected="false">Assertions</button>
+      </div>
+
+      <div class="auth-banner hidden" id="authBanner"></div>
+
+      <div class="tab-panel" id="panel-params">
+        <div id="paramsTable" class="kv-table"></div>
+        <button class="add-row" data-target="params">+ Add param</button>
+      </div>
+      <div class="tab-panel hidden" id="panel-headers">
+        <div id="headersTable" class="kv-table"></div>
+        <button class="add-row" data-target="headers">+ Add header</button>
+      </div>
+      <div class="tab-panel hidden" id="panel-auth">
+        <select id="authType">
+          <option value="inherit">Inherit from collection</option>
+          <option value="none">No Auth</option>
+          <option value="basic">Basic Auth</option>
+          <option value="digest">Digest Auth</option>
+          <option value="bearer">Bearer Token</option>
+          <option value="oauth2">OAuth 2.0</option>
+          <option value="apikey">API Key</option>
+          <option value="awsv4">AWS Signature (SigV4)</option>
+        </select>
+        <div id="authFields"></div>
+      </div>
+      <div class="tab-panel hidden" id="panel-body">
+        <p class="hint">Request type is set above (HTTP / GraphQL / SOAP / gRPC). For HTTP, choose how the body is
+        shaped here.</p>
+        <select id="bodyMode">
+          <option value="none">None</option>
+          <option value="raw">Raw</option>
+          <option value="urlencoded">x-www-form-urlencoded</option>
+          <option value="formdata">Form Data</option>
+          <option value="graphql" hidden>GraphQL</option>
+          <option value="soap" hidden>SOAP</option>
+          <option value="grpc" hidden>gRPC</option>
+        </select>
+        <select id="bodyLanguage">
+          <option value="json">JSON</option>
+          <option value="xml">XML</option>
+          <option value="text">Text</option>
+        </select>
+        <div id="soapFields" class="hidden">
+          <div class="field-row">
+            <label>SOAP Version</label>
+            <select id="soapVersion">
+              <option value="1.1">1.1 (SOAPAction header)</option>
+              <option value="1.2">1.2 (action in Content-Type)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label>SOAPAction</label>
+            <input type="text" id="soapAction" placeholder="http://tempuri.org/Add">
+          </div>
+          <div class="btn-row">
+            <button id="soapInsertEnvelope" type="button">Insert envelope</button>
+            <button id="soapFormatXml" type="button">Format XML</button>
+          </div>
+          <div class="field-row">
+            <label>WS-Security</label>
+            <select id="wsSecurityMode">
+              <option value="">None</option>
+              <option value="passwordText">UsernameToken — PasswordText</option>
+              <option value="passwordDigest">UsernameToken — PasswordDigest</option>
+            </select>
+          </div>
+          <div id="wsSecurityCreds" class="hidden">
+            <div class="field-row"><label>Username</label><input type="text" id="wsSecurityUsername"></div>
+            <div class="field-row"><label>Password</label><input type="password" id="wsSecurityPassword"></div>
+            <p class="hint">Inserted into &lt;soap:Header&gt; at send time (not stored in the body text) — PasswordDigest is
+            generated fresh per request since it's time-bound (Nonce + Created), so it won't match if you inspect the raw body above.</p>
+          </div>
+          <div class="field-row">
+            <label><input type="checkbox" id="signBody"> Sign body (X.509)</label>
+          </div>
+          <p class="hint">XML-signs &lt;soap:Body&gt; using the client certificate configured in Settings (the same one
+          used for mutual TLS). Inserts a &lt;ds:Signature&gt; into the WS-Security header at send time.</p>
+        </div>
+        <div id="grpcFields" class="hidden">
+          <div class="field-row">
+            <label>Target (host:port)</label>
+            <input type="text" id="grpcTarget" placeholder="localhost:50051">
+          </div>
+          <div class="field-row">
+            <label><input type="checkbox" id="grpcPlaintext"> Plaintext (h2c, no TLS)</label>
+          </div>
+          <div class="field-row">
+            <label>Full method</label>
+            <input type="text" id="grpcFullMethod" placeholder="/package.Service/Method">
+          </div>
+          <p class="hint">Request JSON goes in the body editor below (protojson — field names are the message's proto3
+          field names). Metadata is gRPC metadata, not HTTP headers, so it's kept in its own table.</p>
+          <label>Metadata</label>
+          <div id="grpcMetadataTable" class="kv-table"></div>
+          <button class="add-row" data-target="grpcMetadata">+ Add metadata</button>
+        </div>
+        <textarea id="bodyRaw" class="code-area" placeholder="Request body" rows="12"></textarea>
+        <div id="bodyRawHint" class="hint hidden"></div>
+        <div id="bodyUrlEncodedTable" class="kv-table hidden"></div>
+        <button class="add-row hidden" id="addUrlEncodedRow" data-target="urlencoded">+ Add field</button>
+        <div id="bodyFormDataTable" class="kv-table hidden"></div>
+        <button class="add-row hidden" id="addFormDataRow" data-target="formdata">+ Add field</button>
+      </div>
+      <div class="tab-panel hidden" id="panel-script">
+        <p class="hint">Imported Postman scripts are shown for reference only — hapidays does not execute JavaScript.
+        Use a Capture rule instead to pull a value out of the response into an environment variable (e.g. the
+        SAP/OData "X-CSRF-Token: Fetch" pattern).</p>
+        <label>Pre-request script (read-only)</label>
+        <textarea id="preScriptView" rows="4" readonly></textarea>
+        <label>Test script (read-only)</label>
+        <textarea id="testScriptView" rows="4" readonly></textarea>
+        <label>Captures</label>
+        <div id="capturesTable" class="kv-table"></div>
         <div class="btn-row">
-          <button id="soapInsertEnvelope" type="button">Insert envelope</button>
-          <button id="soapFormatXml" type="button">Format XML</button>
+          <button class="add-row" data-target="captures">+ Add capture</button>
+          <button id="suggestCapturesBtn" title="Scan the scripts above for common pm.environment.set(...) patterns">Suggest from script</button>
         </div>
-        <div class="field-row">
-          <label>WS-Security</label>
-          <select id="wsSecurityMode">
-            <option value="">None</option>
-            <option value="passwordText">UsernameToken — PasswordText</option>
-            <option value="passwordDigest">UsernameToken — PasswordDigest</option>
-          </select>
-        </div>
-        <div id="wsSecurityCreds" class="hidden">
-          <div class="field-row"><label>Username</label><input type="text" id="wsSecurityUsername"></div>
-          <div class="field-row"><label>Password</label><input type="password" id="wsSecurityPassword"></div>
-          <p class="hint">Inserted into &lt;soap:Header&gt; at send time (not stored in the body text) — PasswordDigest is
-          generated fresh per request since it's time-bound (Nonce + Created), so it won't match if you inspect the raw body above.</p>
-        </div>
-        <div class="field-row">
-          <label><input type="checkbox" id="signBody"> Sign body (X.509)</label>
-        </div>
-        <p class="hint">XML-signs &lt;soap:Body&gt; using the client certificate configured in Settings (the same one
-        used for mutual TLS). Inserts a &lt;ds:Signature&gt; into the WS-Security header at send time.</p>
       </div>
-      <div id="grpcFields" class="hidden">
-        <div class="field-row">
-          <label>Target (host:port)</label>
-          <input type="text" id="grpcTarget" placeholder="localhost:50051">
-        </div>
-        <div class="field-row">
-          <label><input type="checkbox" id="grpcPlaintext"> Plaintext (h2c, no TLS)</label>
-        </div>
-        <div class="field-row">
-          <label>Full method</label>
-          <input type="text" id="grpcFullMethod" placeholder="/package.Service/Method">
-        </div>
-        <p class="hint">Request JSON goes in the body editor below (protojson — field names are the message's proto3
-        field names). Metadata is gRPC metadata, not HTTP headers, so it's kept in its own table.</p>
-        <label>Metadata</label>
-        <div id="grpcMetadataTable" class="kv-table"></div>
-        <button class="add-row" data-target="grpcMetadata">+ Add metadata</button>
-      </div>
-      <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
-      <div id="bodyRawHint" class="hint hidden"></div>
-      <div id="bodyUrlEncodedTable" class="kv-table hidden"></div>
-      <button class="add-row hidden" id="addUrlEncodedRow" data-target="urlencoded">+ Add field</button>
-      <div id="bodyFormDataTable" class="kv-table hidden"></div>
-      <button class="add-row hidden" id="addFormDataRow" data-target="formdata">+ Add field</button>
-    </div>
-    <div class="tab-panel hidden" id="panel-script">
-      <p class="hint">Imported Postman scripts are shown for reference only — hapidays does not execute JavaScript.
-      Use a Capture rule instead to pull a value out of the response into an environment variable (e.g. the
-      SAP/OData "X-CSRF-Token: Fetch" pattern).</p>
-      <label>Pre-request script (read-only)</label>
-      <textarea id="preScriptView" rows="4" readonly></textarea>
-      <label>Test script (read-only)</label>
-      <textarea id="testScriptView" rows="4" readonly></textarea>
-      <label>Captures</label>
-      <div id="capturesTable" class="kv-table"></div>
-      <div class="btn-row">
-        <button class="add-row" data-target="captures">+ Add capture</button>
-        <button id="suggestCapturesBtn" title="Scan the scripts above for common pm.environment.set(...) patterns">Suggest from script</button>
+
+      <div class="tab-panel hidden" id="panel-assertions">
+        <p class="hint">Pass/fail checks evaluated after the response comes back — no JS engine, same reasoning as Captures.
+        Shown against a single Send, and aggregated into a pass/fail count when this request runs as part of a
+        collection run.</p>
+        <div id="assertionsTable" class="kv-table"></div>
+        <button class="add-row" data-target="assertions">+ Add assertion</button>
       </div>
     </div>
 
-    <div class="tab-panel hidden" id="panel-assertions">
-      <p class="hint">Pass/fail checks evaluated after the response comes back — no JS engine, same reasoning as Captures.
-      Shown against a single Send, and aggregated into a pass/fail count when this request runs as part of a
-      collection run.</p>
-      <div id="assertionsTable" class="kv-table"></div>
-      <button class="add-row" data-target="assertions">+ Add assertion</button>
-    </div>
+    <div class="splitter" id="responseSplitter" title="Drag to resize" aria-hidden="true"></div>
 
     <div class="response-area">
-      <div class="response-status" id="responseStatus">No response yet</div>
+      <div class="resp-status-bar">
+        <span class="response-status" id="responseStatus">No response yet</span>
+        <span class="resp-meta hidden" id="respMeta"></span>
+        <span class="assert-pill hidden" id="respAssertPill"></span>
+      </div>
       <div id="assertionSummary" class="hidden"></div>
-      <div class="tabs" id="responseTabs">
-        <button class="tab active" data-rtab="body">Body</button>
-        <button class="tab" data-rtab="headers">Headers</button>
+      <div class="tabs" id="responseTabs" role="tablist">
+        <button class="tab active" data-rtab="body" role="tab" aria-selected="true">Body</button>
+        <button class="tab" data-rtab="headers" role="tab" aria-selected="false">Headers</button>
       </div>
       <pre class="response-body" id="responseBody"></pre>
       <div class="response-headers hidden" id="responseHeaders"></div>
@@ -218,7 +285,21 @@
 </div>
 
 <div id="modalOverlay" class="modal-overlay hidden">
-  <div class="modal" id="modalContent"></div>
+  <div class="modal" id="modalContent" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="palette-overlay hidden" id="paletteOverlay">
+  <div class="palette">
+    <div class="palette-input-row">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="paletteInput" type="text" placeholder="Go to request, folder, environment, or action…">
+      <span class="kbd">esc</span>
+    </div>
+    <div class="palette-list" id="paletteList"></div>
+    <div class="palette-hint">
+      <span>↑↓ navigate</span><span>↵ open</span><span>⌘K toggle</span>
+    </div>
+  </div>
 </div>
 
 <script src="/app.js"></script>

@@ -160,6 +160,17 @@ type RequestSpec struct {
 	Captures []Capture `json:"captures,omitempty"`
 	Assertions []Assertion `json:"assertions,omitempty"`
 
+	// Protocol is a purely descriptive tag for wire protocols that don't
+	// otherwise show up in Method/Body.Mode — currently only "odata" (an
+	// OData call is plain HTTP on the wire; Body.Mode is "none"/"raw" same
+	// as any other HTTP request). Never read by execute.go/runner.go — it
+	// only drives which chip the frontend's protocol switcher highlights
+	// and how a request is tagged in the collection tree. Empty means
+	// "infer from Method/Body.Mode" (http/graphql/soap/grpc), same as
+	// before this field existed, so older saved collections round-trip
+	// unchanged.
+	Protocol string `json:"protocol,omitempty"`
+
 	// Raw scripts imported from Postman, kept for visibility but not
 	// executed (see internal/importer doc comment for why).
 	PreRequestScript string `json:"preRequestScript,omitempty"`

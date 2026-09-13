@@ -10,10 +10,28 @@ const state = {
   selectedPath: null,      // array of indices into currentCollection.root leading to the request node
   expandedFolders: new Set(), // node ids of folders currently expanded in the tree
   settings: {},
+  // Per-session TLS override ('' | 'skip' | 'enforce') — lives here rather
+  // than read off a permanent sidebar control, since it's rarely touched
+  // (see the field's own comment in openSettings for why it's tucked into
+  // Settings instead). '' means "use the global Settings checkbox".
+  tlsOverride: '',
 };
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+// Quick filter over whatever's currently expanded/rendered in the tree —
+// deliberately shallow (it doesn't auto-expand collapsed folders to reveal
+// a match inside them). The command palette (⌘K) is the tool for "find
+// this request no matter where it's collapsed/which collection it's in";
+// this is just "narrow what I'm already looking at".
+let treeFilterQuery = '';
+function applyTreeFilter() {
+  const q = treeFilterQuery.trim().toLowerCase();
+  $$('#collectionList .tree-request').forEach(row => {
+    row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
 
 async function api(path, opts) {
   const res = await fetch('/api' + path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
@@ -40,7 +58,7 @@ function renderCollectionList() {
     wrap.className = 'tree-node';
     const header = document.createElement('div');
     header.className = 'tree-folder';
-    header.textContent = col.name || '(untitled collection)';
+    header.innerHTML = `<span class="row-name">${escapeHtml(col.name || '(untitled collection)')}</span>`;
 
     const actions = document.createElement('span');
     actions.className = 'col-actions';
@@ -80,6 +98,7 @@ function renderCollectionList() {
       if (isOpen) {
         state.currentCollection = null;
         state.selectedPath = null;
+        updateCrumb();
       } else {
         openCollection(col.id);
         return; // openCollection re-renders once it has fetched the collection
@@ -96,6 +115,7 @@ function renderCollectionList() {
     }
     container.appendChild(wrap);
   }
+  applyTreeFilter();
 }
 
 // A "+ Request" / "+ Folder" row shown at collection root and inside every
@@ -153,7 +173,10 @@ async function deleteNode(siblings, index, node) {
   // wrong node.
   state.selectedPath = null;
   currentRequest = blankRequest();
+  lastSavedSnapshot = null;
+  $('#dirtyDot').classList.add('hidden');
   renderRequestForm();
+  updateCrumb();
   await persistCollectionTree();
 }
 
@@ -239,7 +262,7 @@ function renderNodes(nodes, path, container) {
       const expanded = state.expandedFolders.has(node.id);
       const folderDiv = document.createElement('div');
       folderDiv.className = 'tree-folder';
-      folderDiv.textContent = (expanded ? '📂 ' : '📁 ') + node.name;
+      folderDiv.innerHTML = `<span class="row-name">${expanded ? '📂 ' : '📁 '}${escapeHtml(node.name)}</span>`;
 
       const actions = document.createElement('span');
       actions.className = 'col-actions';
@@ -289,8 +312,17 @@ function renderNodes(nodes, path, container) {
     } else {
       const reqDiv = document.createElement('div');
       const method = (node.request && node.request.method) || 'GET';
-      reqDiv.className = `tree-request method-${method.replace(/[^A-Za-z]/g, '')}` + (samePath(nodePath, state.selectedPath) ? ' selected' : '');
-      reqDiv.innerHTML = `<span class="method-tag">${escapeHtml(method)}</span>${escapeHtml(node.name)}`;
+      const bodyMode = node.request && node.request.body && node.request.body.mode;
+      // Same protocol reasoning as currentProtocol() above: gRPC already
+      // shows up via Method, but GraphQL/SOAP/OData all use an ordinary
+      // HTTP method, so without this every one of them would show a plain
+      // "POST" tag indistinguishable from a normal HTTP request.
+      let protoClass = '', tagText = method;
+      if (node.request && node.request.protocol === 'odata') { protoClass = 'proto-odata'; tagText = 'OData'; }
+      else if (bodyMode === 'graphql') { protoClass = 'proto-graphql'; tagText = 'GQL'; }
+      else if (bodyMode === 'soap') { protoClass = 'proto-soap'; tagText = 'SOAP'; }
+      reqDiv.className = `tree-request method-${method.replace(/[^A-Za-z]/g, '')}` + (protoClass ? ' ' + protoClass : '') + (samePath(nodePath, state.selectedPath) ? ' selected' : '');
+      reqDiv.innerHTML = `<span class="method-tag">${escapeHtml(tagText)}</span><span class="row-name">${escapeHtml(node.name)}</span>`;
       reqDiv.onclick = () => selectRequest(nodePath);
 
       const actions = document.createElement('span');
@@ -339,12 +371,17 @@ function selectRequest(path) {
 // ---------- request form ----------
 
 let currentRequest = blankRequest();
+// Snapshot of the last-loaded-or-saved request, used only to drive the
+// unsaved-changes dot in the crumb bar — compared against a fresh
+// collectFormIntoRequest() read on every edit. Not involved in Send/Save.
+let lastSavedSnapshot = null;
 
 function blankRequest() {
   return {
     method: 'GET', urlRaw: '', query: [], headers: [],
     auth: { type: 'none', params: {} },
     body: { mode: 'none' },
+    protocol: '',
     captures: [], assertions: [], preRequestScript: '', testScript: '', hasScript: false,
   };
 }
@@ -355,6 +392,12 @@ function loadRequestIntoForm(req) {
   if (!currentRequest.auth.params) currentRequest.auth.params = {};
   if (!currentRequest.body) currentRequest.body = { mode: 'none' };
   renderRequestForm();
+  // The form now mirrors currentRequest exactly (composeUrlFromFields etc.
+  // just normalized it) — that's the "saved" baseline for the dirty dot.
+  collectFormIntoRequest();
+  lastSavedSnapshot = JSON.stringify(currentRequest);
+  $('#dirtyDot').classList.add('hidden');
+  updateCrumb();
 }
 
 // ---------- URL bar: Protocol / Domain / Port / Path fields ----------
@@ -466,6 +509,161 @@ function renderRequestForm() {
 
   $('#preScriptView').value = currentRequest.preRequestScript || '';
   $('#testScriptView').value = currentRequest.testScript || '';
+
+  updateProtoSwitchUI();
+  updateTabBadges();
+}
+
+// ---------- protocol switcher ----------
+//
+// A request's "protocol" isn't a stored field — it's implied by method +
+// body.mode (see internal/model: BodyMode is none/raw/urlencoded/formdata/
+// graphql/soap/grpc, and gRPC additionally sets Method to "GRPC"). This
+// switcher is a friendlier front end for that same state: picking GraphQL/
+// SOAP/gRPC sets body.mode (and method, for gRPC) exactly like the old
+// Body-tab dropdown did, so nothing downstream (renderBodyFields, send,
+// save) needed to change. HTTP covers the four body-shape modes that
+// dropdown still owns (none/raw/urlencoded/formdata).
+function currentProtocol() {
+  if (currentRequest.method === 'GRPC' || currentRequest.body.mode === 'grpc') return 'grpc';
+  if (currentRequest.body.mode === 'graphql') return 'graphql';
+  if (currentRequest.body.mode === 'soap') return 'soap';
+  // OData isn't a body shape (it's plain HTTP — see model.RequestSpec.Protocol's
+  // doc comment) so it only wins when none of the above already claimed the
+  // request; it's tracked via the request's own protocol field, set by the
+  // OData importer or by picking this chip by hand.
+  if (currentRequest.protocol === 'odata') return 'odata';
+  return 'http';
+}
+
+function updateProtoSwitchUI() {
+  const proto = currentProtocol();
+  $$('#protoSwitch .proto-opt').forEach(btn => {
+    const active = btn.dataset.p === proto;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+}
+
+function setProtocol(p) {
+  if (p === currentProtocol()) return;
+  currentRequest.protocol = ''; // cleared by default; only 'odata' below sets it back
+  if (p === 'http') {
+    if (['graphql', 'soap', 'grpc'].includes(currentRequest.body.mode)) currentRequest.body.mode = 'none';
+    if (currentRequest.method === 'GRPC') currentRequest.method = 'GET';
+  } else if (p === 'graphql') {
+    currentRequest.body.mode = 'graphql';
+    if (currentRequest.method === 'GRPC') currentRequest.method = 'POST';
+  } else if (p === 'soap') {
+    currentRequest.body.mode = 'soap';
+    if (currentRequest.method === 'GRPC') currentRequest.method = 'POST';
+  } else if (p === 'grpc') {
+    currentRequest.body.mode = 'grpc';
+    currentRequest.method = 'GRPC';
+  } else if (p === 'odata') {
+    // Plain HTTP on the wire — OData is just a tag, so drop any leftover
+    // GraphQL/SOAP/gRPC body shape rather than layer the tag on top of one.
+    if (['graphql', 'soap', 'grpc'].includes(currentRequest.body.mode)) currentRequest.body.mode = 'none';
+    if (currentRequest.method === 'GRPC') currentRequest.method = 'GET';
+    currentRequest.protocol = 'odata';
+  }
+  $('#methodSelect').value = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(currentRequest.method) ? currentRequest.method : 'GET';
+  $('#bodyMode').value = currentRequest.body.mode;
+  renderBodyFields();
+  updateProtoSwitchUI();
+}
+
+// ---------- tab badges & crumb ----------
+
+function setTabBadge(tabName, count) {
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  if (!tab) return;
+  let badge = tab.querySelector('.tab-count');
+  if (count > 0) {
+    if (!badge) { badge = document.createElement('span'); badge.className = 'tab-count'; tab.appendChild(badge); }
+    badge.textContent = String(count);
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
+function updateTabBadges() {
+  setTabBadge('params', (currentRequest.query || []).length);
+  setTabBadge('headers', (currentRequest.headers || []).length);
+  setTabBadge('script', (currentRequest.captures || []).length);
+  setTabBadge('assertions', (currentRequest.assertions || []).length);
+  const authTab = document.querySelector('.tab[data-tab="auth"]');
+  if (authTab) authTab.classList.toggle('auth-active', !!currentRequest.auth.type && currentRequest.auth.type !== 'none');
+  updateAuthBanner();
+}
+
+const AUTH_LABELS = {
+  basic: 'Basic Auth', digest: 'Digest Auth', bearer: 'Bearer Token',
+  oauth2: 'OAuth 2.0', apikey: 'API Key', awsv4: 'AWS Signature (SigV4)',
+};
+
+// Surfaces what's actually going to authenticate this request without
+// having to click into the Auth tab — "inherit" in particular is opaque
+// otherwise, since the request itself carries no clue what it inherits.
+function updateAuthBanner() {
+  const banner = $('#authBanner');
+  const type = currentRequest.auth.type;
+  if (!type || type === 'none') {
+    banner.classList.add('hidden');
+    banner.innerHTML = '';
+    return;
+  }
+  const lockIcon = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  let text;
+  if (type === 'inherit') {
+    const colAuth = state.currentCollection && state.currentCollection.auth;
+    if (colAuth && colAuth.type && colAuth.type !== 'none') {
+      text = `Inherits <b>${AUTH_LABELS[colAuth.type] || colAuth.type}</b> from "${escapeHtml(state.currentCollection.name)}" — switch to the Auth tab to override.`;
+    } else if (state.currentCollection) {
+      text = `Set to inherit from "${escapeHtml(state.currentCollection.name)}", but that collection has no auth configured — this request sends with none.`;
+    } else {
+      text = `Set to inherit from the collection — open the collection this request belongs to for the actual auth used.`;
+    }
+  } else {
+    text = `Uses <b>${AUTH_LABELS[type] || type}</b> for this request only, overriding whatever the collection is set to.`;
+  }
+  banner.classList.remove('hidden');
+  banner.innerHTML = lockIcon + ' ' + text;
+}
+
+// Best-effort path through the tree to the selected request, purely for
+// the crumb bar — falls back to a method+URL label for history entries,
+// which aren't tied to a tree node (state.selectedPath is null for those).
+function updateCrumb() {
+  const el = $('#crumbText');
+  if (state.currentCollection && state.selectedPath) {
+    const names = [state.currentCollection.name];
+    let nodes = state.currentCollection.root;
+    for (const i of state.selectedPath) {
+      const node = nodes[i];
+      if (!node) break;
+      names.push(node.name);
+      nodes = node.children;
+    }
+    const current = names.pop();
+    const prefix = names.map(n => escapeHtml(n)).join(' <span class="sep">/</span> ');
+    el.innerHTML = (prefix ? prefix + ' <span class="sep">/</span> ' : '') + `<span class="current">${escapeHtml(current)}</span>`;
+  } else if (currentRequest && (currentRequest.urlRaw || currentRequest.body.mode === 'grpc')) {
+    el.textContent = `(unsaved) ${currentRequest.method} ${currentRequest.urlRaw || (currentRequest.body.grpc && currentRequest.body.grpc.fullMethod) || ''}`;
+  } else {
+    el.textContent = 'No request selected';
+  }
+}
+
+// Recomputes currentRequest from the DOM and refreshes the dirty dot + tab
+// badges. Wired once as a delegated listener on #requestWorkspace rather
+// than per-field, so it also covers rows added/removed after the initial
+// render (kv-tables rebuild their DOM on every change).
+function onWorkspaceChanged() {
+  collectFormIntoRequest();
+  const dirty = lastSavedSnapshot !== null && JSON.stringify(currentRequest) !== lastSavedSnapshot;
+  $('#dirtyDot').classList.toggle('hidden', !dirty);
+  updateTabBadges();
 }
 
 function renderKVTable(containerId, list, onChange) {
@@ -566,12 +764,13 @@ function renderAssertionSummary(assertions) {
     el.innerHTML = '';
     return;
   }
-  const passed = assertions.filter(a => a.passed).length;
-  const allPassed = passed === assertions.length;
+  // Headline pass/fail count lives in the #respAssertPill next to the
+  // status now (see setAssertPill) — this box is just the per-assertion
+  // detail underneath it, so the count isn't stated twice.
+  const allPassed = assertions.every(a => a.passed);
   el.classList.remove('hidden');
   el.className = allPassed ? 'assertion-summary assertion-pass' : 'assertion-summary assertion-fail';
-  el.innerHTML = `<strong>${passed}/${assertions.length} assertions passed</strong>` +
-    '<ul>' + assertions.map(a =>
+  el.innerHTML = '<ul>' + assertions.map(a =>
       `<li class="${a.passed ? 'assertion-pass' : 'assertion-fail'}">${a.passed ? '✓' : '✗'} ${escapeHtml(a.message || a.type)}</li>`
     ).join('') + '</ul>';
 }
@@ -759,6 +958,11 @@ function renderBodyFields() {
   const isGrpc = mode === 'grpc';
   const isRawLike = mode === 'raw' || mode === 'graphql' || mode === 'soap' || isGrpc;
   const isSoap = mode === 'soap';
+  // The Body-tab dropdown only chooses among the four HTTP body shapes now
+  // (none/raw/urlencoded/formdata) — GraphQL/SOAP/gRPC are chosen via the
+  // protocol switcher above, so hide the dropdown entirely rather than
+  // show a control with nothing left to decide.
+  $('#bodyMode').classList.toggle('hidden', mode === 'graphql' || isSoap || isGrpc);
   $('#bodyRaw').classList.toggle('hidden', !isRawLike);
   $('#bodyLanguage').classList.toggle('hidden', !isRawLike || isSoap || isGrpc);
   $('#soapFields').classList.toggle('hidden', !isSoap);
@@ -906,16 +1110,21 @@ function collectFormIntoRequest() {
 // not part of the saved RequestSpec — undefined here correctly omits the
 // field so the server falls back to the global Settings toggle.
 function currentInsecureSkipVerifyOverride() {
-  const v = $('#tlsOverrideSelect').value;
-  if (v === 'skip') return true;
-  if (v === 'enforce') return false;
+  if (state.tlsOverride === 'skip') return true;
+  if (state.tlsOverride === 'enforce') return false;
   return undefined;
+}
+
+function updateTlsWarnDot() {
+  $('#tlsWarnDot').classList.toggle('hidden', state.tlsOverride !== 'skip');
 }
 
 async function sendRequest() {
   collectFormIntoRequest();
   $('#responseStatus').textContent = 'Sending…';
   $('#responseStatus').className = 'response-status';
+  $('#respMeta').classList.add('hidden');
+  setAssertPill(null);
   $('#responseBody').textContent = '';
   try {
     const result = await api('/send', {
@@ -938,31 +1147,82 @@ async function sendRequest() {
   }
 }
 
+// Regex-based tokenizer, not a real parser — good enough for coloring text
+// JSON.stringify already produced (see renderResponse), not for validating
+// arbitrary input. Escapes each piece itself rather than escaping the whole
+// string upfront, since escapeHtml turns `"` into `&quot;` and would break
+// the token regex's own quote matching.
+function highlightJson(text) {
+  const tokenRe = /"(?:\\.|[^"\\])*"(?:\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+  let out = '';
+  let lastIndex = 0;
+  let m;
+  while ((m = tokenRe.exec(text)) !== null) {
+    out += escapeHtml(text.slice(lastIndex, m.index));
+    const token = m[0];
+    let cls = 'tok-num';
+    if (token[0] === '"') cls = /:\s*$/.test(token) ? 'tok-key' : 'tok-str';
+    else if (token === 'true' || token === 'false') cls = 'tok-bool';
+    else if (token === 'null') cls = 'tok-null';
+    out += `<span class="${cls}">${escapeHtml(token)}</span>`;
+    lastIndex = tokenRe.lastIndex;
+  }
+  out += escapeHtml(text.slice(lastIndex));
+  return out;
+}
+
+function setAssertPill(assertions) {
+  const pill = $('#respAssertPill');
+  if (!assertions || assertions.length === 0) {
+    pill.classList.add('hidden');
+    return;
+  }
+  const passed = assertions.filter(a => a.passed).length;
+  const allOk = passed === assertions.length;
+  pill.classList.remove('hidden');
+  pill.className = 'assert-pill ' + (allOk ? 'assert-ok' : 'assert-fail');
+  pill.textContent = `${passed}/${assertions.length} assertions passed`;
+}
+
 function renderResponse(result) {
   if (result.error) {
     $('#responseStatus').textContent = `Error: ${result.error} (${result.durationMs}ms)`;
     $('#responseStatus').className = 'response-status status-err';
+    $('#respMeta').classList.add('hidden');
+    setAssertPill(null);
     $('#responseBody').textContent = '';
     renderAssertionSummary(null);
     return;
   }
   renderAssertionSummary(result.assertions);
+  setAssertPill(result.assertions);
   const fault = !result.bodyIsBase64 ? detectSoapFault(result.body) : null;
   const statusClass = fault ? 'status-err' : 'status-' + Math.floor(result.status / 100);
   $('#responseStatus').className = 'response-status ' + statusClass;
   $('#responseStatus').textContent = fault
-    ? `SOAP Fault${fault.label ? ' (' + fault.label + ')' : ''}: ${fault.message} · HTTP ${result.status} · ${result.durationMs}ms`
-    : `${result.status} ${result.statusText || ''} · ${result.durationMs}ms · ${result.sizeBytes}B`;
+    ? `SOAP Fault${fault.label ? ' (' + fault.label + ')' : ''}: ${fault.message} · HTTP ${result.status}`
+    // statusText is Go's resp.Status ("200 OK" — code and reason phrase
+    // together, see execute.go), so it already carries the code; prepending
+    // result.status again produced "200 200 OK".
+    : (result.statusText || String(result.status));
+  $('#respMeta').classList.remove('hidden');
+  $('#respMeta').textContent = `${result.durationMs} ms · ${result.sizeBytes} B`;
 
   let bodyText = result.bodyIsBase64 ? '(binary response, base64)\n' + result.body : result.body;
+  let isJson = false;
   if (!result.bodyIsBase64) {
     try {
       bodyText = JSON.stringify(JSON.parse(result.body), null, 2);
+      isJson = true;
     } catch (_) {
       if (looksLikeXml(result.body, result.headers)) bodyText = formatXml(result.body);
     }
   }
-  $('#responseBody').textContent = bodyText;
+  if (isJson) {
+    $('#responseBody').innerHTML = highlightJson(bodyText);
+  } else {
+    $('#responseBody').textContent = bodyText;
+  }
 
   const headersDiv = $('#responseHeaders');
   headersDiv.innerHTML = '';
@@ -984,6 +1244,8 @@ async function saveCurrentRequest() {
   state.currentCollection = await api(`/collections/${state.currentCollection.id}`, {
     method: 'PUT', body: JSON.stringify(state.currentCollection),
   });
+  lastSavedSnapshot = JSON.stringify(currentRequest);
+  $('#dirtyDot').classList.add('hidden');
   renderCollectionList();
 }
 
@@ -1364,7 +1626,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
         ? '\n' + result.assertions.map(a => `${a.passed ? '✓' : '✗'} ${a.message}`).join('\n') : '';
       const bodyPreview = (result.body || '').slice(0, 500);
       card.querySelector('.step-card-output').innerHTML = `
-        <span style="color:${ok ? 'var(--ok)' : 'var(--danger)'}">← ${escapeHtml(result.error || (result.status + ' ' + (result.statusText || '')))} · ${result.durationMs}ms${result.resolvedUrl ? ' · ' + escapeHtml(result.resolvedUrl) : ''}</span>
+        <span style="color:${ok ? 'var(--ok)' : 'var(--danger)'}">← ${escapeHtml(result.error || result.statusText || String(result.status))} · ${result.durationMs}ms${result.resolvedUrl ? ' · ' + escapeHtml(result.resolvedUrl) : ''}</span>
         <pre>${escapeHtml(bodyPreview)}${capturedText ? escapeHtml(capturedText) : ''}${assertionText ? escapeHtml(assertionText) : ''}</pre>
       `;
       if (result.captured && Object.keys(result.captured).length) await loadEnvironments();
@@ -1494,11 +1756,27 @@ async function openSettings() {
       <input type="text" id="setClientKey" value="${escapeAttr(settings.clientKeyFile || '')}"></div>
     <div class="field-row"><label>Proxy URL override (blank = use system proxy env vars)</label>
       <input type="text" id="setProxy" value="${escapeAttr(settings.proxyUrl || '')}"></div>
+
+    <h4>This session only</h4>
+    <div class="field-row"><label>TLS verification override</label>
+      <select id="setTlsOverride">
+        <option value="">Use the checkbox above</option>
+        <option value="skip">Always skip verification (insecure)</option>
+        <option value="enforce">Always enforce verification</option>
+      </select>
+      <p class="hint">For the odd case the checkbox above doesn't cover well — e.g. you want strict verification
+      everywhere else but need to skip it for one throwaway/self-signed target right now, without editing the
+      setting above and remembering to undo it. Resets to "use the checkbox above" on restart; not saved with
+      Settings below.</p>
+    </div>
+
     <div class="modal-actions">
       <button id="setCancel">Cancel</button>
       <button id="setSave" style="background:var(--accent);color:#fff">Save</button>
     </div>
   `);
+  $('#setTlsOverride').value = state.tlsOverride;
+  $('#setTlsOverride').onchange = (e) => { state.tlsOverride = e.target.value; updateTlsWarnDot(); };
   $('#setCancel').onclick = closeModal;
   $('#setSave').onclick = async () => {
     await api('/settings', {
@@ -1828,6 +2106,134 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) { return escapeHtml(s); }
 
+// ---------- command palette ----------
+//
+// Fetches every collection's full tree (state.collections only holds
+// summaries) so ⌘K can jump to a request regardless of which collection is
+// currently open or which folders are expanded — the gap the sidebar's
+// tree filter deliberately leaves. Rebuilt fresh on every open: cheap for
+// the collection counts this app deals with, and avoids the index going
+// stale after an import/rename/delete.
+async function buildPaletteIndex() {
+  const cols = await Promise.all(state.collections.map(c => api(`/collections/${c.id}`).catch(() => null)));
+  const items = [];
+  cols.forEach(col => {
+    if (!col) return;
+    const walk = (nodes, path, crumbNames, crumbIds) => {
+      nodes.forEach((n, i) => {
+        const nodePath = path.concat(i);
+        if (n.children) {
+          walk(n.children, nodePath, crumbNames.concat(n.name), crumbIds.concat(n.id));
+        } else if (n.request) {
+          items.push({
+            type: 'request',
+            label: n.name,
+            sub: crumbNames.join(' / '),
+            method: n.request.protocol === 'odata' ? 'OData'
+              : n.request.body && n.request.body.mode === 'graphql' ? 'GQL'
+              : n.request.body && n.request.body.mode === 'soap' ? 'SOAP'
+              : n.request.method,
+            collectionId: col.id,
+            nodePath,
+            ancestorFolderIds: crumbIds,
+          });
+        }
+      });
+    };
+    walk(col.root, [], [col.name], []);
+  });
+  state.environments.forEach(env => items.push({ type: 'env', label: env.name, sub: 'Switch environment', envId: env.id }));
+  items.push({ type: 'action', label: 'New collection', sub: 'Action', run: () => $('#newCollectionBtn').click() });
+  items.push({ type: 'action', label: 'Cookie jar', sub: 'Action', run: openCookiesModal });
+  items.push({ type: 'action', label: 'Settings', sub: 'Action', run: openSettings });
+  return items;
+}
+
+let paletteItems = [];
+let paletteHighlight = 0;
+
+function renderPaletteList(items) {
+  const list = $('#paletteList');
+  list.innerHTML = '';
+  if (items.length === 0) {
+    list.innerHTML = '<div class="palette-empty">No matches</div>';
+    return;
+  }
+  items.slice(0, 40).forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'palette-item' + (i === paletteHighlight ? ' hi' : '');
+    const tag = item.type === 'request'
+      ? `<span class="method-tag">${escapeHtml(item.method || 'GET')}</span>`
+      : `<span class="proto-dot"></span>`;
+    row.innerHTML = `${tag}<span class="rname">${escapeHtml(item.label)}</span><span class="rpath">${escapeHtml(item.sub || '')}</span>`;
+    row.onclick = () => openPaletteItem(item);
+    list.appendChild(row);
+  });
+}
+
+async function openPaletteItem(item) {
+  if (item.type === 'request') {
+    if (!state.currentCollection || state.currentCollection.id !== item.collectionId) {
+      state.currentCollection = await api(`/collections/${item.collectionId}`);
+    }
+    item.ancestorFolderIds.forEach(id => state.expandedFolders.add(id));
+    selectRequest(item.nodePath);
+  } else if (item.type === 'env') {
+    state.currentEnvironmentId = item.envId;
+    $('#envSelect').value = item.envId;
+  } else if (item.type === 'action') {
+    item.run();
+  }
+  closePalette();
+}
+
+function filterPaletteItems(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return paletteItems;
+  return paletteItems.filter(it => (it.label + ' ' + (it.sub || '')).toLowerCase().includes(q));
+}
+
+async function openPalette() {
+  $('#paletteOverlay').classList.remove('hidden');
+  $('#paletteInput').value = '';
+  $('#paletteInput').focus();
+  paletteHighlight = 0;
+  renderPaletteList([]);
+  paletteItems = await buildPaletteIndex();
+  renderPaletteList(filterPaletteItems(''));
+}
+function closePalette() {
+  $('#paletteOverlay').classList.add('hidden');
+}
+function togglePalette() {
+  $('#paletteOverlay').classList.contains('hidden') ? openPalette() : closePalette();
+}
+
+// ---------- response panel resizing ----------
+
+function wireResponseSplitter() {
+  const splitter = $('#responseSplitter');
+  const responseArea = $('.response-area');
+  let startY = 0, startHeight = 0, dragging = false;
+  splitter.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startY = e.clientY;
+    startHeight = responseArea.getBoundingClientRect().height;
+    document.body.style.cursor = 'row-resize';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const next = Math.max(120, startHeight - (e.clientY - startY));
+    responseArea.style.flex = `0 0 ${next}px`;
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+  });
+}
+
 // ---------- wiring ----------
 
 // Catches any button handler that forgot its own try/catch around an
@@ -1878,16 +2284,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $$('#requestTabs .tab').forEach(tab => {
     tab.onclick = () => {
-      $$('#requestTabs .tab').forEach(t => t.classList.remove('active'));
+      $$('#requestTabs .tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
       $$('.tab-panel').forEach(p => p.classList.add('hidden'));
       tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
       $('#panel-' + tab.dataset.tab).classList.remove('hidden');
     };
   });
   $$('#responseTabs .tab').forEach(tab => {
     tab.onclick = () => {
-      $$('#responseTabs .tab').forEach(t => t.classList.remove('active'));
+      $$('#responseTabs .tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
       tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
       $('#responseBody').classList.toggle('hidden', tab.dataset.rtab !== 'body');
       $('#responseHeaders').classList.toggle('hidden', tab.dataset.rtab !== 'headers');
     };
@@ -1940,7 +2348,92 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#bodyRaw').addEventListener('input', () => { if (currentRequest.body.mode === 'soap') checkSoapWellFormed(); });
   $('#modalOverlay').onclick = (e) => { if (e.target === $('#modalOverlay')) closeModal(); };
 
+  // ---------- protocol switcher ----------
+  $$('#protoSwitch .proto-opt').forEach(btn => {
+    btn.onclick = () => setProtocol(btn.dataset.p);
+  });
+
+  // ---------- New / Import dropdown ----------
+  const newBtn = $('#newBtn');
+  const newDropdown = $('#newDropdown');
+  newBtn.onclick = (e) => {
+    e.stopPropagation();
+    const opening = newDropdown.classList.contains('hidden');
+    newDropdown.classList.toggle('hidden', !opening);
+    newBtn.setAttribute('aria-expanded', String(opening));
+  };
+  // Any click inside the dropdown (an import/new action) closes it — every
+  // item either opens a modal or a file picker, so there's nothing left to
+  // do in the dropdown itself once clicked.
+  newDropdown.addEventListener('click', () => {
+    newDropdown.classList.add('hidden');
+    newBtn.setAttribute('aria-expanded', 'false');
+  });
+  document.addEventListener('click', () => {
+    newDropdown.classList.add('hidden');
+    newBtn.setAttribute('aria-expanded', 'false');
+  });
+  $('#newReqMenuItem').onclick = () => {
+    if (!state.currentCollection) { alert('Open or create a collection first — the new request needs somewhere to go.'); return; }
+    addRequestNode(state.currentCollection.root, []);
+  };
+  $('#newFolderMenuItem').onclick = () => {
+    if (!state.currentCollection) { alert('Open or create a collection first — the new folder needs somewhere to go.'); return; }
+    addFolderNode(state.currentCollection.root, null);
+  };
+
+  // ---------- sidebar: Collections/History tabs + tree filter ----------
+  const tabCollections = $('#sidebarTabCollections');
+  const tabHistory = $('#sidebarTabHistory');
+  tabCollections.onclick = () => {
+    tabCollections.classList.add('active'); tabCollections.setAttribute('aria-selected', 'true');
+    tabHistory.classList.remove('active'); tabHistory.setAttribute('aria-selected', 'false');
+    $('#collectionList').classList.remove('hidden');
+    $('#historyList').classList.add('hidden');
+  };
+  tabHistory.onclick = () => {
+    tabHistory.classList.add('active'); tabHistory.setAttribute('aria-selected', 'true');
+    tabCollections.classList.remove('active'); tabCollections.setAttribute('aria-selected', 'false');
+    $('#historyList').classList.remove('hidden');
+    $('#collectionList').classList.add('hidden');
+  };
+  $('#treeSearchInput').oninput = (e) => { treeFilterQuery = e.target.value; applyTreeFilter(); };
+
+  // ---------- command palette ----------
+  $('#paletteOpenBtn').onclick = openPalette;
+  $('#paletteOverlay').onclick = (e) => { if (e.target === $('#paletteOverlay')) closePalette(); };
+  $('#paletteInput').oninput = (e) => {
+    paletteHighlight = 0;
+    renderPaletteList(filterPaletteItems(e.target.value));
+  };
+  $('#paletteInput').onkeydown = (e) => {
+    const visible = filterPaletteItems($('#paletteInput').value).slice(0, 40);
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteHighlight = Math.min(paletteHighlight + 1, visible.length - 1); renderPaletteList(visible); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); paletteHighlight = Math.max(paletteHighlight - 1, 0); renderPaletteList(visible); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (visible[paletteHighlight]) openPaletteItem(visible[paletteHighlight]); }
+    else if (e.key === 'Escape') { closePalette(); }
+  };
+
+  // ---------- global keyboard shortcuts ----------
+  document.addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); togglePalette(); return; }
+    if (!$('#paletteOverlay').classList.contains('hidden') && e.key === 'Escape') { closePalette(); return; }
+    if (!$('#modalOverlay').classList.contains('hidden') && e.key === 'Escape') { closeModal(); return; }
+    // Below here, ignore shortcuts fired from within the palette input or a
+    // modal — Enter in those has its own meaning already wired above.
+    if (document.activeElement === $('#paletteInput')) return;
+    if (mod && e.key === 'Enter') { e.preventDefault(); sendRequest(); return; }
+    if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveCurrentRequest(); return; }
+  });
+
+  // ---------- response panel resize + dirty/badge tracking ----------
+  wireResponseSplitter();
+  const workspace = $('#requestWorkspace');
+  ['input', 'change', 'click'].forEach(evt => workspace.addEventListener(evt, onWorkspaceChanged));
+
   renderRequestForm();
+  updateTlsWarnDot();
   loadCollections();
   loadEnvironments();
   loadHistory();

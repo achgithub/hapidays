@@ -53,7 +53,18 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", api.New(st))
-	mux.Handle("/", http.FileServer(http.FS(uiFS)))
+	// embed.FS reports a zero-value ModTime for every file (embedding
+	// doesn't preserve real mtimes), so without an explicit no-store here,
+	// http.FileServer's default caching behavior gives browsers nothing
+	// reliable to revalidate against and some end up caching the UI far
+	// more aggressively than a plain refresh should — the binary changes
+	// on every rebuild, so there's never a good reason to reuse a cached
+	// copy of these files.
+	fileServer := http.FileServer(http.FS(uiFS))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		fileServer.ServeHTTP(w, r)
+	}))
 
 	addr := net.JoinHostPort(*host, fmt.Sprintf("%d", *port))
 	log.Printf("hapidays listening on http://%s (data dir: %s)", addr, dir)

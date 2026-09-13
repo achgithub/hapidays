@@ -102,10 +102,11 @@ func Import(data []byte, serviceRootURL string, auth model.Auth, newID func() st
 	baseURLVar := "baseUrl"
 	root2 := []*model.Node{
 		{ID: newID(), Name: "$metadata", Request: &model.RequestSpec{
-			Method: "GET",
-			URLRaw: "{{" + baseURLVar + "}}/$metadata",
-			Auth:   model.Auth{Type: model.AuthInherit},
-			Body:   model.Body{Mode: model.BodyNone},
+			Method:   "GET",
+			URLRaw:   "{{" + baseURLVar + "}}/$metadata",
+			Auth:     model.Auth{Type: model.AuthInherit},
+			Body:     model.Body{Mode: model.BodyNone},
+			Protocol: "odata",
 		}},
 	}
 
@@ -137,11 +138,12 @@ func buildEntitySetRequests(set entitySet, et entityType, baseURLVar, version st
 	jsonQuery := jsonFormatQuery(version)
 
 	list := &model.Node{ID: newID(), Name: "List", Request: &model.RequestSpec{
-		Method: "GET",
-		URLRaw: base,
-		Query:  jsonQuery,
-		Auth:   model.Auth{Type: model.AuthInherit},
-		Body:   model.Body{Mode: model.BodyNone},
+		Method:   "GET",
+		URLRaw:   base,
+		Query:    jsonQuery,
+		Auth:     model.Auth{Type: model.AuthInherit},
+		Body:     model.Body{Mode: model.BodyNone},
+		Protocol: "odata",
 	}}
 
 	nodes := []*model.Node{list}
@@ -149,11 +151,12 @@ func buildEntitySetRequests(set entitySet, et entityType, baseURLVar, version st
 	if len(et.Keys) > 0 {
 		keySeg := buildKeySegment(et)
 		nodes = append(nodes, &model.Node{ID: newID(), Name: "Get by key", Request: &model.RequestSpec{
-			Method: "GET",
-			URLRaw: base + "(" + keySeg + ")",
-			Query:  jsonQuery,
-			Auth:   model.Auth{Type: model.AuthInherit},
-			Body:   model.Body{Mode: model.BodyNone},
+			Method:   "GET",
+			URLRaw:   base + "(" + keySeg + ")",
+			Query:    jsonQuery,
+			Auth:     model.Auth{Type: model.AuthInherit},
+			Body:     model.Body{Mode: model.BodyNone},
+			Protocol: "odata",
 		}})
 	}
 
@@ -167,11 +170,12 @@ func buildEntitySetRequests(set entitySet, et entityType, baseURLVar, version st
 			model.KV{Key: "$top", Value: "5"},
 		)
 		nodes = append(nodes, &model.Node{ID: newID(), Name: "Filter example", Request: &model.RequestSpec{
-			Method: "GET",
-			URLRaw: base,
-			Query:  query,
-			Auth:   model.Auth{Type: model.AuthInherit},
-			Body:   model.Body{Mode: model.BodyNone},
+			Method:   "GET",
+			URLRaw:   base,
+			Query:    query,
+			Auth:     model.Auth{Type: model.AuthInherit},
+			Body:     model.Body{Mode: model.BodyNone},
+			Protocol: "odata",
 		}})
 	}
 
