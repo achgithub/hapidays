@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 
 	"pmclone/internal/api"
+	"pmclone/internal/seed"
 	"pmclone/internal/store"
 )
 
@@ -40,6 +41,9 @@ func main() {
 	st, err := store.New(dir)
 	if err != nil {
 		log.Fatalf("init store at %s: %v", dir, err)
+	}
+	if err := st.SeedSmokeTestCollection(seed.SmokeTestCollection); err != nil {
+		log.Printf("seed smoke-test collection: %v", err) // non-fatal — app still starts fine without it
 	}
 
 	uiFS, err := fs.Sub(webFS, "web")

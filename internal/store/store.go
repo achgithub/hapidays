@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"pmclone/internal/model"
 )
@@ -92,6 +93,36 @@ func (s *Store) DeleteCollection(id string) error {
 
 func (s *Store) ListCollections() ([]*model.Collection, error) {
 	return listDir[model.Collection](filepath.Join(s.dir, "collections"))
+}
+
+// smokeTestSeedMarker, once present, means the bundled smoke-test
+// collection has already been seeded into this data directory — whether
+// it's still there or the user has since deleted it. Presence of the
+// collection file itself can't be used for this check: deleting it must
+// not resurrect it on the next launch.
+const smokeTestSeedMarker = ".smoke-test-seeded"
+
+// SeedSmokeTestCollection writes the bundled "pmclone smoke test"
+// collection (see internal/seed) into a data directory exactly once —
+// so a fresh install has something to test the app against without a
+// manual import — and is a no-op on every run after that.
+func (s *Store) SeedSmokeTestCollection(data []byte) error {
+	markerPath := filepath.Join(s.dir, smokeTestSeedMarker)
+	if _, err := os.Stat(markerPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	var col model.Collection
+	if err := json.Unmarshal(data, &col); err != nil {
+		return fmt.Errorf("parse seed collection: %w", err)
+	}
+	col.ID = "smoke-test"
+	col.UpdatedAt = time.Now()
+	if err := s.SaveCollection(&col); err != nil {
+		return err
+	}
+	return os.WriteFile(markerPath, []byte("seeded\n"), 0o600)
 }
 
 // ---- environments ----
