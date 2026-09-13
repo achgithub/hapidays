@@ -338,13 +338,17 @@ function loadRequestIntoForm(req) {
 // There's no separate `port` field in the data model — this just reads
 // and rewrites the :port segment of urlRaw, so it works with everything
 // already built around a single URL string (vars, captures, history).
-// Matches "scheme://host" up to the first /, :, ?, or # — the {{var}}
-// tokens in a templated host (e.g. "{{baseUrl}}") don't contain any of
-// those characters, so this holds even when the host itself is a
-// variable, as long as it isn't the whole authority that's templated
-// (e.g. a URL that's just "{{fullBaseUrlWithScheme}}/path" has no literal
-// authority for the field to attach a port to, and is left alone).
-const URL_AUTHORITY_RE = /^(https?:\/\/[^/:?#]+)(:(\d+))?/;
+//
+// Matches either a literal "scheme://host" prefix, or — the far more
+// common real case, since most collections use a {{baseUrl}}-style
+// variable rather than a literal host per request — a single leading
+// {{var}} token standing in for the whole authority (e.g. the smoke-test
+// collection's "{{baseHttpbin}}/basic-auth/..."). Either way, an optional
+// :port right after it is captured. Resolve() substitutes the {{var}}
+// token with its literal value before sending, so "{{baseHttpbin}}:1111/x"
+// resolves to "https://httpbin.org:1111/x" — the concatenation works out
+// at send time even though the port sits after an unresolved token here.
+const URL_AUTHORITY_RE = /^((?:https?:\/\/[^/:?#]+)|(?:\{\{[^}]+\}\}))(:(\d+))?/;
 
 function syncPortFieldFromUrl() {
   const m = $('#urlInput').value.match(URL_AUTHORITY_RE);
