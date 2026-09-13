@@ -1385,6 +1385,46 @@ function openWsdlImportModal() {
   };
 }
 
+// ---------- OData import ----------
+
+function openODataImportModal() {
+  const auth = { type: 'none', params: {} };
+  showModal(`
+    <h3>Import OData service</h3>
+    <p class="hint">Generates a List, Get-by-key, and $filter example request per entity set, from the
+    service's $metadata. Detects OData v2 vs v4 and adjusts $filter functions, key-literal quoting, and
+    JSON format handling accordingly.</p>
+    <div class="field-row"><label>$metadata URL</label><input type="text" id="odataUrlInput" placeholder="https://host/service/\$metadata"></div>
+    <label>Auth (needed if the service gates $metadata — SAP Gateway/CPI usually does)</label>
+    <select id="odataAuthType">
+      <option value="none">No Auth</option>
+      <option value="basic">Basic Auth</option>
+      <option value="bearer">Bearer Token</option>
+      <option value="apikey">API Key</option>
+    </select>
+    <div id="odataAuthFields"></div>
+    <div class="modal-actions">
+      <button id="odataImportCancel">Cancel</button>
+      <button id="odataImportGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  const renderFields = () => populateAuthFields(auth.type, auth.params, $('#odataAuthFields'), renderFields);
+  renderFields();
+  $('#odataAuthType').onchange = (e) => { auth.type = e.target.value; renderFields(); };
+  $('#odataImportCancel').onclick = closeModal;
+  $('#odataImportGo').onclick = async () => {
+    const url = $('#odataUrlInput').value.trim();
+    if (!url) { alert('Provide the service\'s $metadata URL.'); return; }
+    try {
+      await api('/odata/import', { method: 'POST', body: JSON.stringify({ url, auth }) });
+      await loadCollections();
+      closeModal();
+    } catch (e) {
+      alert('OData import failed: ' + e.message);
+    }
+  };
+}
+
 // ---------- XML pretty-printing ----------
 
 // detectSoapFault finds a SOAP Fault regardless of HTTP status — a fault is
@@ -1477,6 +1517,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importCollectionBtn').onclick = () => $('#importCollectionInput').click();
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
   $('#importWsdlBtn').onclick = openWsdlImportModal;
+  $('#importODataBtn').onclick = openODataImportModal;
 
   $('#importEnvBtn').onclick = () => $('#importEnvInput').click();
   $('#importEnvInput').onchange = (e) => importFile(e.target, '/environments/import', loadEnvironments);

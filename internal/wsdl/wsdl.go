@@ -15,117 +15,21 @@
 package wsdl
 
 import (
-	"encoding/xml"
 	"fmt"
-	"io"
 	"strings"
 
 	"hapidays/internal/model"
+	"hapidays/internal/xmltree"
 )
 
-// node is a namespace-aware but prefix-agnostic parse tree. WSDL documents
-// mix wsdl:/soap:/soap12:/xsd: (or no) prefixes for the same elements
-// depending on the tool that generated them, so callers match on Local
-// (and, only when it matters — like telling soap:address from
-// soap12:address apart — on Space) rather than the raw prefixed name.
-type node struct {
-	Local    string
-	Space    string
-	Attrs    map[string]string
-	Children []*node
-	Text     string
-}
+type node = xmltree.Node
 
-func parseTree(r io.Reader) (*node, error) {
-	dec := xml.NewDecoder(r)
-	var stack []*node
-	var root *node
-	for {
-		tok, err := dec.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			n := &node{Local: t.Name.Local, Space: t.Name.Space, Attrs: map[string]string{}}
-			for _, a := range t.Attr {
-				n.Attrs[a.Name.Local] = a.Value
-			}
-			if len(stack) > 0 {
-				parent := stack[len(stack)-1]
-				parent.Children = append(parent.Children, n)
-			} else {
-				root = n
-			}
-			stack = append(stack, n)
-		case xml.EndElement:
-			if len(stack) > 0 {
-				stack = stack[:len(stack)-1]
-			}
-		case xml.CharData:
-			if len(stack) > 0 {
-				stack[len(stack)-1].Text += string(t)
-			}
-		}
-	}
-	if root == nil {
-		return nil, fmt.Errorf("no root element found")
-	}
-	return root, nil
-}
-
-func children(n *node, local string) []*node {
-	var out []*node
-	for _, c := range n.Children {
-		if c.Local == local {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-func child(n *node, local string) *node {
-	for _, c := range n.Children {
-		if c.Local == local {
-			return c
-		}
-	}
-	return nil
-}
-
-// descendants finds every node named local anywhere under n, not just
-// direct children — needed to search <types> without knowing how deeply
-// the schema is nested.
-func descendants(n *node, local string) []*node {
-	var out []*node
-	var walk func(*node)
-	walk = func(x *node) {
-		if x.Local == local {
-			out = append(out, x)
-		}
-		for _, c := range x.Children {
-			walk(c)
-		}
-	}
-	for _, c := range n.Children {
-		walk(c)
-	}
-	return out
-}
-
-// localName strips a namespace prefix ("tns:Foo" -> "Foo") — WSDL
-// documents reference each other's elements by QName strings like this
-// constantly (binding type=, operation message=, part element=), and the
-// prefix is meaningless once we're matching by Local name anyway.
-func localName(qname string) string {
-	if i := strings.Index(qname, ":"); i >= 0 {
-		return qname[i+1:]
-	}
-	return qname
-}
+var (
+	children    = xmltree.Children
+	child       = xmltree.Child
+	descendants = xmltree.Descendants
+	localName   = xmltree.LocalName
+)
 
 func isSoap12(n *node) bool {
 	return strings.Contains(n.Space, "wsdl/soap12")
@@ -145,7 +49,7 @@ type operation struct {
 // (named after the WSDL's first <service>, or "WSDL Import") containing
 // one request per discovered SOAP operation.
 func Import(data []byte, sourceURL string, newID func() string) (*model.Collection, error) {
-	root, err := parseTree(strings.NewReader(string(data)))
+	root, err := xmltree.Parse(strings.NewReader(string(data)))
 	if err != nil {
 		return nil, fmt.Errorf("parse WSDL: %w", err)
 	}
@@ -198,7 +102,7 @@ func extractOperations(root *node, targetNS string) []operation {
 
 	// Map message name -> its body wrapper info (element ref, or rpc parts).
 	type msgInfo struct {
-		element string   // document/literal: part element=
+		element  string   // document/literal: part element=
 		rpcParts []string // rpc/literal: part name= for each primitive part
 	}
 	messages := map[string]msgInfo{}

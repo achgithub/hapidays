@@ -20,6 +20,7 @@ import (
 	"hapidays/internal/importer"
 	"hapidays/internal/model"
 	"hapidays/internal/oauth2"
+	"hapidays/internal/odata"
 	"hapidays/internal/runner"
 	"hapidays/internal/store"
 	"hapidays/internal/wsdl"
@@ -45,6 +46,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/collections", s.originGuard(s.listCollections))
 	s.mux.HandleFunc("POST /api/collections/import", s.originGuard(s.importCollection))
 	s.mux.HandleFunc("POST /api/wsdl/import", s.originGuard(s.importWSDL))
+	s.mux.HandleFunc("POST /api/odata/import", s.originGuard(s.importOData))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
 	s.mux.HandleFunc("PUT /api/collections/{id}", s.originGuard(s.saveCollection))
 	s.mux.HandleFunc("DELETE /api/collections/{id}", s.originGuard(s.deleteCollection))
@@ -228,6 +230,72 @@ func fetchWSDL(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("fetching WSDL: server returned HTTP %d", resp.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+}
+
+// importOData accepts a $metadata URL plus an (optional) auth spec and
+// returns a generated collection. Unlike importWSDL's fetchWSDL (a bare,
+// unauthenticated GET), this goes through client.Execute — SAP Gateway/CPI-
+// style services, the primary real-world target here, commonly gate
+// $metadata behind the same auth as the data endpoints, so a bare fetch
+// would just 401. Going through Execute also means mTLS, the configured
+// proxy, and an insecure-TLS override all apply exactly as they would to
+// any other request from this app.
+func (s *Server) importOData(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL  string     `json:"url"`
+		Auth model.Auth `json:"auth"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if req.URL == "" {
+		writeErr(w, 400, fmt.Errorf("a $metadata URL is required"))
+		return
+	}
+
+	settings, err := s.store.LoadSettings()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	metaSpec := model.RequestSpec{
+		Method:  "GET",
+		URLRaw:  req.URL,
+		Auth:    req.Auth,
+		Body:    model.Body{Mode: model.BodyNone},
+		Headers: []model.KV{{Key: "Accept", Value: "application/xml"}},
+	}
+	result, err := client.Execute(ctx, metaSpec, map[string]string{}, client.Options{Settings: settings})
+	if err != nil {
+		writeErr(w, 500, fmt.Errorf("fetch $metadata: %w", err))
+		return
+	}
+	if result.Error != "" {
+		writeErr(w, 400, fmt.Errorf("fetch $metadata: %s", result.Error))
+		return
+	}
+	if result.Status != 200 {
+		writeErr(w, 400, fmt.Errorf("fetching $metadata: server returned HTTP %d — check the URL and auth", result.Status))
+		return
+	}
+
+	serviceRoot := strings.TrimSuffix(req.URL, "$metadata")
+	col, err := odata.Import([]byte(result.Body), serviceRoot, req.Auth, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	col.UpdatedAt = time.Now()
+	if err := s.store.SaveCollection(col); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, col)
 }
 
 func (s *Server) getCollection(w http.ResponseWriter, r *http.Request) {
