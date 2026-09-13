@@ -85,6 +85,10 @@ type Options struct {
 	InsecureSkipVerify *bool // per-request override of Settings.InsecureSkipVerify
 	Timeout            time.Duration
 	Cookies            CookieJar // nil disables cookie persistence
+	// CollectionAuth is substituted in when a request's own Auth.Type is
+	// AuthInherit — the collection (there's no per-folder auth in this
+	// model) is the only thing a request can inherit from.
+	CollectionAuth model.Auth
 }
 
 func buildHTTPClient(opts Options) (*http.Client, error) {
@@ -152,6 +156,10 @@ func buildHTTPClient(opts Options) (*http.Client, error) {
 // receive the WWW-Authenticate challenge, then the real, signed one — so
 // it's handled here rather than in a single applyAuth call.
 func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string, opts Options) (*Result, error) {
+	if spec.Auth.Type == model.AuthInherit {
+		spec.Auth = opts.CollectionAuth
+	}
+
 	rawURL := Resolve(spec.URLRaw, vars)
 
 	bodyBytes, contentType, err := buildBody(spec.Body, vars)

@@ -87,10 +87,18 @@ type RequestSpec struct {
 }
 
 // Node is either a folder (Children non-nil, Request nil) or a request leaf.
+//
+// Children deliberately has no `omitempty`: the frontend tells folder from
+// request purely by `if (node.children)`, and Go's omitempty drops a slice
+// whenever its length is 0 — nil (a request leaf) and a real, currently-
+// empty folder ([]*Node{}) would both vanish from the JSON and become
+// indistinguishable (and misrender as requests) on the next load. Without
+// omitempty, nil still encodes as `null` (falsy) while an empty folder
+// encodes as `[]` (truthy), preserving the distinction.
 type Node struct {
 	ID       string       `json:"id"`
 	Name     string       `json:"name"`
-	Children []*Node      `json:"children,omitempty"`
+	Children []*Node      `json:"children"`
 	Request  *RequestSpec `json:"request,omitempty"`
 }
 

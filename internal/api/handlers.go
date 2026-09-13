@@ -274,6 +274,21 @@ func (s *Server) resolveVars(collectionID, environmentID string) map[string]stri
 	return vars
 }
 
+// collectionAuth loads a collection's auth for AuthInherit resolution.
+// Returns the zero Auth (type "") if collectionID is empty or the
+// collection can't be loaded, which applyAuth treats as a no-op — the
+// same as AuthNone.
+func (s *Server) collectionAuth(collectionID string) model.Auth {
+	if collectionID == "" {
+		return model.Auth{}
+	}
+	col, err := s.store.LoadCollection(collectionID)
+	if err != nil {
+		return model.Auth{}
+	}
+	return col.Auth
+}
+
 func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	var req sendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -296,6 +311,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		Settings:           settings,
 		InsecureSkipVerify: req.InsecureSkipVerify,
 		Cookies:            s.store,
+		CollectionAuth:     s.collectionAuth(req.CollectionID),
 	})
 	if err != nil {
 		writeErr(w, 500, err)
@@ -442,6 +458,7 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 			Settings:           settings,
 			InsecureSkipVerify: req.InsecureSkipVerify,
 			Cookies:            s.store,
+			CollectionAuth:     col.Auth,
 		},
 	})
 	writeJSON(w, 200, results)

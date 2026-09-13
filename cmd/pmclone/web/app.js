@@ -8,6 +8,7 @@ const state = {
   environments: [],
   currentEnvironmentId: '',
   selectedPath: null,      // array of indices into currentCollection.root leading to the request node
+  expandedFolders: new Set(), // node ids of folders currently expanded in the tree
   settings: {},
 };
 
@@ -40,16 +41,27 @@ function renderCollectionList() {
     const header = document.createElement('div');
     header.className = 'tree-folder';
     header.textContent = col.name || '(untitled collection)';
+
+    const actions = document.createElement('span');
+    actions.className = 'col-actions';
+
     const run = document.createElement('span');
-    run.className = 'collection-actions';
-    run.textContent = ' ▶';
+    run.className = 'col-action';
+    run.textContent = '▶';
     run.title = 'Run this collection';
     run.onclick = (e) => { e.stopPropagation(); openRunModal(col.id, null, col.name); };
-    header.appendChild(run);
+    actions.appendChild(run);
+
+    const auth = document.createElement('span');
+    auth.className = 'col-action';
+    auth.textContent = '🔑';
+    auth.title = 'Collection auth (used by requests set to "Inherit from collection")';
+    auth.onclick = (e) => { e.stopPropagation(); openCollectionAuthModal(col.id); };
+    actions.appendChild(auth);
 
     const del = document.createElement('span');
-    del.className = 'collection-actions';
-    del.textContent = ' ✕';
+    del.className = 'col-action col-action-danger';
+    del.textContent = '✕';
     del.title = 'Delete collection';
     del.onclick = async (e) => {
       e.stopPropagation();
@@ -58,17 +70,142 @@ function renderCollectionList() {
       if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = null;
       await loadCollections();
     };
-    header.appendChild(del);
-    header.onclick = () => openCollection(col.id);
+    actions.appendChild(del);
+
+    header.appendChild(actions);
+    // Clicking the already-open collection closes it again — otherwise the
+    // only way to get back to the other collections was a page refresh.
+    const isOpen = state.currentCollection && state.currentCollection.id === col.id;
+    header.onclick = () => {
+      if (isOpen) {
+        state.currentCollection = null;
+        state.selectedPath = null;
+      } else {
+        openCollection(col.id);
+        return; // openCollection re-renders once it has fetched the collection
+      }
+      renderCollectionList();
+    };
     wrap.appendChild(header);
-    if (state.currentCollection && state.currentCollection.id === col.id) {
+    if (isOpen) {
       const childrenWrap = document.createElement('div');
       childrenWrap.className = 'tree-children';
+      childrenWrap.appendChild(buildAddRow(state.currentCollection.root, []));
       renderNodes(state.currentCollection.root, [], childrenWrap);
       wrap.appendChild(childrenWrap);
     }
     container.appendChild(wrap);
   }
+}
+
+// A "+ Request" / "+ Folder" row shown at collection root and inside every
+// expanded folder — the only way (besides Postman import) to build up a
+// collection's tree by hand.
+function buildAddRow(siblings, parentPath, folderId) {
+  const row = document.createElement('div');
+  row.className = 'tree-add-row';
+  const addReq = document.createElement('span');
+  addReq.className = 'tree-add-btn';
+  addReq.textContent = '+ Request';
+  addReq.onclick = (e) => { e.stopPropagation(); addRequestNode(siblings, parentPath); };
+  const addFolder = document.createElement('span');
+  addFolder.className = 'tree-add-btn';
+  addFolder.textContent = '+ Folder';
+  addFolder.onclick = (e) => { e.stopPropagation(); addFolderNode(siblings, folderId); };
+  row.appendChild(addReq);
+  row.appendChild(addFolder);
+  return row;
+}
+
+async function addRequestNode(siblings, parentPath) {
+  const name = prompt('Request name:', 'New Request');
+  if (!name) return;
+  const newIndex = siblings.length;
+  siblings.push({ id: crypto.randomUUID(), name, request: blankRequest() });
+  await persistCollectionTree();
+  selectRequest(parentPath.concat(newIndex));
+}
+
+async function addFolderNode(siblings, folderId) {
+  const name = prompt('Folder name:', 'New Folder');
+  if (!name) return;
+  const node = { id: crypto.randomUUID(), name, children: [] };
+  siblings.push(node);
+  if (folderId) state.expandedFolders.add(folderId); // keep the parent open so the new folder is visible
+  state.expandedFolders.add(node.id); // and show the new (empty) folder expanded, not collapsed-and-invisible
+  await persistCollectionTree();
+}
+
+async function renameNode(node) {
+  const name = prompt('Rename to:', node.name);
+  if (!name || name === node.name) return;
+  node.name = name;
+  await persistCollectionTree();
+}
+
+async function deleteNode(siblings, index, node) {
+  const kind = node.children ? 'folder' : 'request';
+  const extra = node.children && node.children.length ? ' and everything inside it' : '';
+  if (!confirm(`Delete ${kind} "${node.name}"${extra}?`)) return;
+  siblings.splice(index, 1);
+  // Indices shift under any selection at or after this point — simplest
+  // safe thing is to drop the selection rather than risk pointing at the
+  // wrong node.
+  state.selectedPath = null;
+  currentRequest = blankRequest();
+  renderRequestForm();
+  await persistCollectionTree();
+}
+
+async function persistCollectionTree() {
+  state.currentCollection = await api(`/collections/${state.currentCollection.id}`, {
+    method: 'PUT', body: JSON.stringify(state.currentCollection),
+  });
+  renderCollectionList();
+}
+
+// The auth a request set to "Inherit from collection" falls back to.
+// There's no per-folder auth in this model, so the collection is the only
+// thing a request can inherit from.
+async function openCollectionAuthModal(collectionId) {
+  const col = (state.currentCollection && state.currentCollection.id === collectionId)
+    ? state.currentCollection
+    : await api(`/collections/${collectionId}`);
+  const auth = col.auth && col.auth.type ? JSON.parse(JSON.stringify(col.auth)) : { type: 'none', params: {} };
+  if (!auth.params) auth.params = {};
+
+  showModal(`
+    <h3>Collection auth — ${escapeHtml(col.name)}</h3>
+    <p class="hint">Used by any request in this collection set to "Inherit from collection".</p>
+    <div class="field-row"><label>Type</label>
+      <select id="colAuthType">
+        <option value="none">No Auth</option>
+        <option value="basic">Basic Auth</option>
+        <option value="digest">Digest Auth</option>
+        <option value="bearer">Bearer Token</option>
+        <option value="oauth2">OAuth 2.0</option>
+        <option value="apikey">API Key</option>
+        <option value="awsv4">AWS Signature (SigV4)</option>
+      </select>
+    </div>
+    <div id="colAuthFields" class="kv-table"></div>
+    <div class="modal-actions">
+      <button id="colAuthCancel">Cancel</button>
+      <button id="colAuthSave" style="background:var(--accent);color:#fff">Save</button>
+    </div>
+  `);
+
+  const rerender = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerender);
+  $('#colAuthType').value = auth.type;
+  rerender();
+  $('#colAuthType').onchange = (e) => { auth.type = e.target.value; rerender(); };
+  $('#colAuthCancel').onclick = closeModal;
+  $('#colAuthSave').onclick = async () => {
+    col.auth = auth;
+    const saved = await api(`/collections/${col.id}`, { method: 'PUT', body: JSON.stringify(col) });
+    if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = saved;
+    closeModal();
+  };
 }
 
 async function openCollection(id) {
@@ -81,27 +218,73 @@ function renderNodes(nodes, path, container) {
   nodes.forEach((node, i) => {
     const nodePath = path.concat(i);
     if (node.children) {
+      const expanded = state.expandedFolders.has(node.id);
       const folderDiv = document.createElement('div');
       folderDiv.className = 'tree-folder';
-      folderDiv.textContent = '📁 ' + node.name;
+      folderDiv.textContent = (expanded ? '📂 ' : '📁 ') + node.name;
+
+      const actions = document.createElement('span');
+      actions.className = 'col-actions';
       const run = document.createElement('span');
-      run.className = 'collection-actions';
-      run.textContent = ' ▶';
+      run.className = 'col-action';
+      run.textContent = '▶';
       run.title = 'Run this folder';
       run.onclick = (e) => { e.stopPropagation(); openRunModal(state.currentCollection.id, node.id, node.name); };
-      folderDiv.appendChild(run);
-      const childrenWrap = document.createElement('div');
-      childrenWrap.className = 'tree-children';
-      folderDiv.onclick = () => childrenWrap.classList.toggle('hidden');
+      actions.appendChild(run);
+      const rename = document.createElement('span');
+      rename.className = 'col-action';
+      rename.textContent = '✎';
+      rename.title = 'Rename folder';
+      rename.onclick = (e) => { e.stopPropagation(); renameNode(node); };
+      actions.appendChild(rename);
+      const del = document.createElement('span');
+      del.className = 'col-action col-action-danger';
+      del.textContent = '✕';
+      del.title = 'Delete folder (and everything in it)';
+      del.onclick = (e) => { e.stopPropagation(); deleteNode(nodes, i, node); };
+      actions.appendChild(del);
+      folderDiv.appendChild(actions);
+
+      folderDiv.onclick = () => {
+        if (expanded) state.expandedFolders.delete(node.id);
+        else state.expandedFolders.add(node.id);
+        renderCollectionList();
+      };
       container.appendChild(folderDiv);
-      container.appendChild(childrenWrap);
-      renderNodes(node.children, nodePath, childrenWrap);
+
+      // Collapsed by default (only nodes explicitly expanded are drawn) so
+      // a collection with several folders doesn't flood the sidebar's
+      // scroll region — that was the "everything else disappeared" bug.
+      if (expanded) {
+        const childrenWrap = document.createElement('div');
+        childrenWrap.className = 'tree-children';
+        childrenWrap.appendChild(buildAddRow(node.children, nodePath, node.id));
+        renderNodes(node.children, nodePath, childrenWrap);
+        container.appendChild(childrenWrap);
+      }
     } else {
       const reqDiv = document.createElement('div');
       const method = (node.request && node.request.method) || 'GET';
       reqDiv.className = `tree-request method-${method.replace(/[^A-Za-z]/g, '')}` + (samePath(nodePath, state.selectedPath) ? ' selected' : '');
       reqDiv.innerHTML = `<span class="method-tag">${escapeHtml(method)}</span>${escapeHtml(node.name)}`;
       reqDiv.onclick = () => selectRequest(nodePath);
+
+      const actions = document.createElement('span');
+      actions.className = 'col-actions';
+      const rename = document.createElement('span');
+      rename.className = 'col-action';
+      rename.textContent = '✎';
+      rename.title = 'Rename request';
+      rename.onclick = (e) => { e.stopPropagation(); renameNode(node); };
+      actions.appendChild(rename);
+      const del = document.createElement('span');
+      del.className = 'col-action col-action-danger';
+      del.textContent = '✕';
+      del.title = 'Delete request';
+      del.onclick = (e) => { e.stopPropagation(); deleteNode(nodes, i, node); };
+      actions.appendChild(del);
+      reqDiv.appendChild(actions);
+
       container.appendChild(reqDiv);
     }
   });
@@ -266,9 +449,14 @@ function runSuggestCaptures() {
 }
 
 function renderAuthFields() {
-  const type = currentRequest.auth.type;
-  const params = currentRequest.auth.params;
-  const container = $('#authFields');
+  populateAuthFields(currentRequest.auth.type, currentRequest.auth.params, $('#authFields'), renderAuthFields);
+}
+
+// Builds the fields for one auth type into container. Generic over which
+// auth object it's editing (a request's or a collection's) — rerender is
+// called back when a sub-control (like oauth2's grant type) needs the
+// field set redrawn.
+function populateAuthFields(type, params, container, rerender) {
   container.innerHTML = '';
   const field = (key, placeholder, isPassword) => {
     const input = document.createElement('input');
@@ -298,11 +486,11 @@ function renderAuthFields() {
     field('region', 'Region (e.g. us-east-1)');
     field('service', 'Service (e.g. execute-api, s3)');
   } else if (type === 'oauth2') {
-    renderOAuth2Fields(container, params);
+    renderOAuth2Fields(container, params, rerender);
   }
 }
 
-function renderOAuth2Fields(container, params) {
+function renderOAuth2Fields(container, params, rerender) {
   const field = (key, placeholder, isPassword) => {
     const input = document.createElement('input');
     input.type = isPassword ? 'password' : 'text';
@@ -317,7 +505,7 @@ function renderOAuth2Fields(container, params) {
     <option value="password">Username &amp; Password</option>
     <option value="authorization_code">Authorization Code</option>`;
   grantSelect.value = params.grantType || 'client_credentials';
-  grantSelect.onchange = () => { params.grantType = grantSelect.value; renderAuthFields(); };
+  grantSelect.onchange = () => { params.grantType = grantSelect.value; rerender(); };
   container.appendChild(grantSelect);
 
   field('accessTokenUrl', 'Access Token URL');
