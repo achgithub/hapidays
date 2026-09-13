@@ -249,6 +249,12 @@ type sendRequest struct {
 	CollectionID       string            `json:"collectionId,omitempty"`
 	EnvironmentID      string            `json:"environmentId,omitempty"`
 	InsecureSkipVerify *bool             `json:"insecureSkipVerify,omitempty"`
+	// ExtraVars are merged on top of the collection+environment vars,
+	// taking precedence — the same "one iteration-data row" override
+	// runner.Run applies internally via mergeVars, exposed here so the
+	// step-through runner (built on this endpoint, not /api/run) can
+	// replay a single row without its own var-resolution path.
+	ExtraVars map[string]string `json:"extraVars,omitempty"`
 }
 
 func (s *Server) resolveVars(collectionID, environmentID string) map[string]string {
@@ -303,6 +309,9 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := s.resolveVars(req.CollectionID, req.EnvironmentID)
+	for k, v := range req.ExtraVars {
+		vars[k] = v
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 65*time.Second)
 	defer cancel()

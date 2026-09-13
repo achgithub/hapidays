@@ -749,6 +749,18 @@ async function loadHistoryEntry(entry) {
 
 // ---------- collection runner ----------
 
+// Shared by "Run" and "Step through…" — both read the same iteration-data
+// file/count fields on the Run modal, so a data set entered once works
+// either way.
+async function readIterationDataFromRunModal() {
+  let dataRows = null;
+  const file = $('#runDataFile').files[0];
+  if (file) dataRows = await parseDataFile(file);
+  const iterations = parseInt($('#runIterations').value, 10) || 1;
+  if (!dataRows && iterations > 1) dataRows = Array.from({ length: iterations }, () => ({}));
+  return dataRows;
+}
+
 function openRunModal(collectionId, folderId, label) {
   showModal(`
     <h3>Run: ${escapeHtml(label)}</h3>
@@ -766,16 +778,15 @@ function openRunModal(collectionId, folderId, label) {
     <div id="runResults"></div>
   `);
   $('#runCancel').onclick = closeModal;
-  $('#runStep').onclick = () => openStepModal(collectionId, folderId, label);
+  $('#runStep').onclick = async () => {
+    const dataRows = await readIterationDataFromRunModal();
+    openStepModal(collectionId, folderId, label, dataRows);
+  };
   $('#runStart').onclick = async () => {
     $('#runStart').disabled = true;
     $('#runStart').textContent = 'Running…';
     try {
-      let dataRows = null;
-      const file = $('#runDataFile').files[0];
-      if (file) dataRows = await parseDataFile(file);
-      const iterations = parseInt($('#runIterations').value, 10) || 1;
-      if (!dataRows && iterations > 1) dataRows = Array.from({ length: iterations }, () => ({}));
+      const dataRows = await readIterationDataFromRunModal();
 
       const results = await api('/run', {
         method: 'POST',
@@ -840,13 +851,24 @@ function findNodeById(nodes, id) {
   return null;
 }
 
-async function openStepModal(collectionId, folderId, label) {
+async function openStepModal(collectionId, folderId, label, dataRows) {
   // Fetched fresh rather than read off state.currentCollection: the ▶/Step
   // icon on a collection row works even when that collection isn't the
   // currently-open one.
   const col = await api(`/collections/${collectionId}`);
   const rootNodes = folderId ? (findNodeById(col.root, folderId)?.children || []) : col.root;
-  const steps = flattenNodesForStep(rootNodes);
+  const baseSteps = flattenNodesForStep(rootNodes);
+
+  // One full pass through baseSteps per data row — same order as
+  // runner.go's Run() (outer loop over iterations, inner loop over
+  // requests). `row: null` (no data file/iteration count given) means
+  // "no extra var overrides", same as a single implicit run.
+  const rows = (dataRows && dataRows.length) ? dataRows : [null];
+  const steps = [];
+  rows.forEach((row, rowIdx) => {
+    baseSteps.forEach(node => steps.push({ node, row, rowIdx }));
+  });
+  const multiRow = rows.length > 1;
 
   showModal(`
     <h3>Step through: ${escapeHtml(label)}</h3>
@@ -859,7 +881,7 @@ async function openStepModal(collectionId, folderId, label) {
     </div>
   `);
 
-  if (steps.length === 0) {
+  if (baseSteps.length === 0) {
     $('#stepProgress').textContent = 'Nothing to step through — this folder has no requests.';
     $('#stepNext').disabled = true;
     $('#stepRunToEnd').disabled = true;
@@ -878,20 +900,24 @@ async function openStepModal(collectionId, folderId, label) {
       $('#stepRunToEnd').disabled = true;
       return;
     }
-    const node = steps[idx];
-    $('#stepProgress').textContent = `Step ${idx + 1} of ${steps.length}: ${node.name}`;
+    const step = steps[idx];
+    const stepInRow = idx % baseSteps.length;
+    const rowLabel = multiRow ? `Row ${step.rowIdx + 1}/${rows.length} · ` : '';
+    $('#stepProgress').textContent = `${rowLabel}Step ${stepInRow + 1} of ${baseSteps.length}: ${step.node.name}`;
   };
 
   // Runs steps[idx], appends an input+output card to the log, advances idx.
   // Shared by "Step" (one call) and "Run to end" (called in a loop).
   const runOneStep = async () => {
-    const node = steps[idx];
+    const step = steps[idx];
+    const node = step.node;
     const req = node.request;
+    const rowTag = multiRow ? `[Row ${step.rowIdx + 1}] ` : '';
     const card = document.createElement('div');
     card.className = 'step-card';
     card.innerHTML = `
-      <div class="step-card-title">${idx + 1}. ${escapeHtml(node.name)}</div>
-      <div class="step-card-input">→ ${escapeHtml(req.method)} ${escapeHtml(req.urlRaw)}${req.auth && req.auth.type && req.auth.type !== 'none' ? ' · auth: ' + escapeHtml(req.auth.type) : ''}${req.body && req.body.mode !== 'none' ? ' · body: ' + escapeHtml(req.body.mode) : ''}</div>
+      <div class="step-card-title">${idx + 1}. ${escapeHtml(rowTag + node.name)}</div>
+      <div class="step-card-input">→ ${escapeHtml(req.method)} ${escapeHtml(req.urlRaw)}${req.auth && req.auth.type && req.auth.type !== 'none' ? ' · auth: ' + escapeHtml(req.auth.type) : ''}${req.body && req.body.mode !== 'none' ? ' · body: ' + escapeHtml(req.body.mode) : ''}${step.row ? ' · row vars: ' + escapeHtml(JSON.stringify(step.row)) : ''}</div>
       <div class="step-card-output">Sending…</div>
     `;
     log.appendChild(card);
@@ -900,7 +926,10 @@ async function openStepModal(collectionId, folderId, label) {
     try {
       const result = await api('/send', {
         method: 'POST',
-        body: JSON.stringify({ request: req, collectionId, environmentId: state.currentEnvironmentId }),
+        body: JSON.stringify({
+          request: req, collectionId, environmentId: state.currentEnvironmentId,
+          extraVars: step.row || undefined,
+        }),
       });
       const ok = !result.error && result.status >= 200 && result.status < 400;
       const capturedText = result.captured && Object.keys(result.captured).length
