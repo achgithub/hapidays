@@ -20,6 +20,7 @@ import (
 
 	"hapidays/internal/client"
 	"hapidays/internal/curlconv"
+	"hapidays/internal/graphqlintro"
 	"hapidays/internal/importer"
 	"hapidays/internal/model"
 	"hapidays/internal/oauth2"
@@ -51,6 +52,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/collections/import", s.originGuard(s.importCollection))
 	s.mux.HandleFunc("POST /api/wsdl/import", s.originGuard(s.importWSDL))
 	s.mux.HandleFunc("POST /api/odata/import", s.originGuard(s.importOData))
+	s.mux.HandleFunc("POST /api/graphql/import", s.originGuard(s.importGraphQL))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
 	s.mux.HandleFunc("PUT /api/collections/{id}", s.originGuard(s.saveCollection))
 	s.mux.HandleFunc("DELETE /api/collections/{id}", s.originGuard(s.deleteCollection))
@@ -293,6 +295,67 @@ func (s *Server) importOData(w http.ResponseWriter, r *http.Request) {
 
 	serviceRoot := strings.TrimSuffix(req.URL, "$metadata")
 	col, err := odata.Import([]byte(result.Body), serviceRoot, req.Auth, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	col.UpdatedAt = time.Now()
+	if err := s.store.SaveCollection(col); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, col)
+}
+
+// importGraphQL POSTs the standard GraphQL introspection query to the
+// given endpoint (through client.Execute, same reasoning as importOData —
+// enterprise GraphQL endpoints commonly require the same auth as any other
+// query) and generates a collection from the schema it returns.
+func (s *Server) importGraphQL(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL  string     `json:"url"`
+		Auth model.Auth `json:"auth"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if req.URL == "" {
+		writeErr(w, 400, fmt.Errorf("a GraphQL endpoint URL is required"))
+		return
+	}
+
+	settings, err := s.store.LoadSettings()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	payload, _ := json.Marshal(map[string]string{"query": graphqlintro.IntrospectionQuery})
+	introspectSpec := model.RequestSpec{
+		Method: "POST",
+		URLRaw: req.URL,
+		Auth:   req.Auth,
+		Body:   model.Body{Mode: model.BodyRaw, Raw: string(payload), RawLanguage: "json"},
+	}
+	result, err := client.Execute(ctx, introspectSpec, map[string]string{}, client.Options{Settings: settings})
+	if err != nil {
+		writeErr(w, 500, fmt.Errorf("introspection query failed: %w", err))
+		return
+	}
+	if result.Error != "" {
+		writeErr(w, 400, fmt.Errorf("introspection query failed: %s", result.Error))
+		return
+	}
+	if result.Status != 200 {
+		writeErr(w, 400, fmt.Errorf("introspection query: server returned HTTP %d — check the URL and auth", result.Status))
+		return
+	}
+
+	col, err := graphqlintro.Import([]byte(result.Body), req.URL, req.Auth, store.NewID)
 	if err != nil {
 		writeErr(w, 400, err)
 		return

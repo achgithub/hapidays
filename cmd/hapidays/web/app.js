@@ -1650,6 +1650,46 @@ function openODataImportModal() {
   };
 }
 
+// ---------- GraphQL introspection import ----------
+
+function openGraphQLImportModal() {
+  const auth = { type: 'none', params: {} };
+  showModal(`
+    <h3>Import GraphQL API</h3>
+    <p class="hint">Runs the standard introspection query against the endpoint and generates a Queries folder
+    (and a Mutations folder, if the schema has one) with one request per field — arguments and a one-level
+    selection set already filled in with placeholders.</p>
+    <div class="field-row"><label>GraphQL endpoint URL</label><input type="text" id="graphqlUrlInput" placeholder="https://api.example.com/graphql"></div>
+    <label>Auth (needed if the endpoint requires it for introspection too)</label>
+    <select id="graphqlAuthType">
+      <option value="none">No Auth</option>
+      <option value="basic">Basic Auth</option>
+      <option value="bearer">Bearer Token</option>
+      <option value="apikey">API Key</option>
+    </select>
+    <div id="graphqlAuthFields"></div>
+    <div class="modal-actions">
+      <button id="graphqlImportCancel">Cancel</button>
+      <button id="graphqlImportGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  const renderFields = () => populateAuthFields(auth.type, auth.params, $('#graphqlAuthFields'), renderFields);
+  renderFields();
+  $('#graphqlAuthType').onchange = (e) => { auth.type = e.target.value; renderFields(); };
+  $('#graphqlImportCancel').onclick = closeModal;
+  $('#graphqlImportGo').onclick = async () => {
+    const url = $('#graphqlUrlInput').value.trim();
+    if (!url) { alert('Provide the GraphQL endpoint URL.'); return; }
+    try {
+      await api('/graphql/import', { method: 'POST', body: JSON.stringify({ url, auth }) });
+      await loadCollections();
+      closeModal();
+    } catch (e) {
+      alert('GraphQL import failed: ' + e.message);
+    }
+  };
+}
+
 // ---------- XML pretty-printing ----------
 
 // detectSoapFault finds a SOAP Fault regardless of HTTP status — a fault is
@@ -1743,6 +1783,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
   $('#importWsdlBtn').onclick = openWsdlImportModal;
   $('#importODataBtn').onclick = openODataImportModal;
+  $('#importGraphQLBtn').onclick = openGraphQLImportModal;
   $('#importCurlBtn').onclick = openCurlImportModal;
   $('#copyAsCurlBtn').onclick = openCurlExportModal;
 
