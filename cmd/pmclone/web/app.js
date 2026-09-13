@@ -780,7 +780,8 @@ function openRunModal(collectionId, folderId, label) {
   $('#runCancel').onclick = closeModal;
   $('#runStep').onclick = async () => {
     const dataRows = await readIterationDataFromRunModal();
-    openStepModal(collectionId, folderId, label, dataRows);
+    const delayMs = parseInt($('#runDelay').value, 10) || 0;
+    openStepModal(collectionId, folderId, label, dataRows, delayMs);
   };
   $('#runStart').onclick = async () => {
     $('#runStart').disabled = true;
@@ -851,7 +852,7 @@ function findNodeById(nodes, id) {
   return null;
 }
 
-async function openStepModal(collectionId, folderId, label, dataRows) {
+async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
   // Fetched fresh rather than read off state.currentCollection: the ▶/Step
   // icon on a collection row works even when that collection isn't the
   // currently-open one.
@@ -959,6 +960,11 @@ async function openStepModal(collectionId, folderId, label, dataRows) {
     $('#stepRunToEnd').disabled = true;
     while (idx < steps.length && !stopped) {
       await runOneStep();
+      if (delayMs > 0 && idx < steps.length && !stopped) {
+        const nextLabel = $('#stepProgress').textContent;
+        $('#stepProgress').textContent = `Waiting ${delayMs}ms… next: ${nextLabel}`;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
   };
   // "Stop" during a Run-to-end just halts the loop after the in-flight
