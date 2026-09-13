@@ -43,6 +43,7 @@ const (
 	BodyURLEncoded BodyMode = "urlencoded"
 	BodyFormData   BodyMode = "formdata"
 	BodyGraphQL    BodyMode = "graphql"
+	BodySoap       BodyMode = "soap"
 )
 
 type FormField struct {
@@ -58,6 +59,8 @@ type Body struct {
 	RawLanguage string      `json:"rawLanguage,omitempty"` // json|xml|text|html
 	URLEncoded  []KV        `json:"urlEncoded,omitempty"`
 	FormData    []FormField `json:"formData,omitempty"`
+	SoapVersion string      `json:"soapVersion,omitempty"` // "1.1" | "1.2" — only used when Mode == soap
+	SoapAction  string      `json:"soapAction,omitempty"`  // only used when Mode == soap
 }
 
 // Capture is our own (non-Postman) feature: after a response comes back,

@@ -447,6 +447,8 @@ function renderRequestForm() {
   $('#bodyMode').value = currentRequest.body.mode || 'none';
   $('#bodyLanguage').value = currentRequest.body.rawLanguage || 'json';
   $('#bodyRaw').value = currentRequest.body.raw || '';
+  $('#soapVersion').value = currentRequest.body.soapVersion || '1.1';
+  $('#soapAction').value = currentRequest.body.soapAction || '';
   renderBodyFields();
 
   $('#preScriptView').value = currentRequest.preRequestScript || '';
@@ -674,10 +676,15 @@ function renderBodyFields() {
   const mode = currentRequest.body.mode;
   // graphql is sent exactly like raw (see buildBody in execute.go — same
   // case, same handling), so it reuses the same textarea + language UI
-  // rather than needing its own.
-  const isRawLike = mode === 'raw' || mode === 'graphql';
+  // rather than needing its own. soap also reuses the textarea (it's just
+  // the envelope XML) but swaps the language picker for SOAP-specific
+  // controls (version, SOAPAction, envelope template) since the language
+  // is always XML.
+  const isRawLike = mode === 'raw' || mode === 'graphql' || mode === 'soap';
+  const isSoap = mode === 'soap';
   $('#bodyRaw').classList.toggle('hidden', !isRawLike);
-  $('#bodyLanguage').classList.toggle('hidden', !isRawLike);
+  $('#bodyLanguage').classList.toggle('hidden', !isRawLike || isSoap);
+  $('#soapFields').classList.toggle('hidden', !isSoap);
   $('#bodyUrlEncodedTable').classList.toggle('hidden', mode !== 'urlencoded');
   $('#addUrlEncodedRow').classList.toggle('hidden', mode !== 'urlencoded');
   $('#bodyFormDataTable').classList.toggle('hidden', mode !== 'formdata');
@@ -688,7 +695,46 @@ function renderBodyFields() {
   if (mode === 'formdata') {
     renderFormDataTable();
   }
+  if (isSoap) {
+    currentRequest.body.rawLanguage = 'xml';
+    checkSoapWellFormed();
+  } else {
+    $('#bodyRawHint').classList.add('hidden');
+  }
 }
+
+// Fast, local feedback before a round-trip: is the body even well-formed
+// XML? Doesn't validate against the SOAP schema (variables like {{token}}
+// would fail that anyway) — just catches typos (unclosed tags, stray &)
+// that would otherwise surface as an opaque server-side parse fault.
+function checkSoapWellFormed() {
+  const hint = $('#bodyRawHint');
+  const raw = $('#bodyRaw').value;
+  if (!raw.trim()) { hint.classList.add('hidden'); return; }
+  const resolved = raw.replace(/\{\{[^}]+\}\}/g, 'x'); // don't let {{vars}} trip the parser
+  const doc = new DOMParser().parseFromString(resolved, 'text/xml');
+  const err = doc.querySelector('parsererror');
+  hint.classList.toggle('hidden', !err);
+  hint.classList.toggle('hint-err', !!err);
+  if (err) hint.textContent = 'Not well-formed XML: ' + err.textContent.split('\n').filter(Boolean)[0];
+}
+
+const SOAP_ENVELOPE_TEMPLATES = {
+  '1.1': `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header/>
+  <soap:Body>
+    <!-- your request element here -->
+  </soap:Body>
+</soap:Envelope>`,
+  '1.2': `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Header/>
+  <soap12:Body>
+    <!-- your request element here -->
+  </soap12:Body>
+</soap12:Envelope>`,
+};
 
 // Form-data rows need a Type (text/file) selector the generic KV table
 // doesn't have, so this is its own renderer rather than reusing
@@ -737,6 +783,8 @@ function collectFormIntoRequest() {
   currentRequest.body.mode = $('#bodyMode').value;
   currentRequest.body.rawLanguage = $('#bodyLanguage').value;
   currentRequest.body.raw = $('#bodyRaw').value;
+  currentRequest.body.soapVersion = $('#soapVersion').value;
+  currentRequest.body.soapAction = $('#soapAction').value;
   return currentRequest;
 }
 
@@ -786,9 +834,12 @@ function renderResponse(result) {
     $('#responseBody').textContent = '';
     return;
   }
-  const statusClass = 'status-' + Math.floor(result.status / 100);
+  const fault = !result.bodyIsBase64 ? detectSoapFault(result.body) : null;
+  const statusClass = fault ? 'status-err' : 'status-' + Math.floor(result.status / 100);
   $('#responseStatus').className = 'response-status ' + statusClass;
-  $('#responseStatus').textContent = `${result.status} ${result.statusText || ''} · ${result.durationMs}ms · ${result.sizeBytes}B`;
+  $('#responseStatus').textContent = fault
+    ? `SOAP Fault${fault.label ? ' (' + fault.label + ')' : ''}: ${fault.message} · HTTP ${result.status} · ${result.durationMs}ms`
+    : `${result.status} ${result.statusText || ''} · ${result.durationMs}ms · ${result.sizeBytes}B`;
 
   let bodyText = result.bodyIsBase64 ? '(binary response, base64)\n' + result.body : result.body;
   if (!result.bodyIsBase64) {
@@ -1295,6 +1346,24 @@ async function importFile(input, endpoint, onDone) {
 
 // ---------- XML pretty-printing ----------
 
+// detectSoapFault finds a SOAP Fault regardless of HTTP status — a fault is
+// a valid, well-formed SOAP response and servers commonly return it with
+// HTTP 200, so success/failure can't be inferred from status code alone.
+// Namespace-agnostic: matches whatever prefix the server used (soap:,
+// soapenv:, SOAP-ENV:, s:, or none) for both SOAP 1.1 (faultcode/faultstring)
+// and 1.2 (Code/Reason) shapes.
+function detectSoapFault(body) {
+  if (!body || !/<[\w:.-]*Fault[\s>]/i.test(body)) return null;
+  const pick = (re) => (body.match(re) || [, ''])[1].trim();
+  const faultstring = pick(/<[\w:.-]*faultstring[^>]*>([\s\S]*?)<\/[\w:.-]*faultstring>/i);
+  const faultcode = pick(/<[\w:.-]*faultcode[^>]*>([\s\S]*?)<\/[\w:.-]*faultcode>/i);
+  const reason = pick(/<[\w:.-]*Reason[^>]*>[\s\S]*?<[\w:.-]*Text[^>]*>([\s\S]*?)<\/[\w:.-]*Text>/i);
+  const code = pick(/<[\w:.-]*Code[^>]*>[\s\S]*?<[\w:.-]*Value[^>]*>([\s\S]*?)<\/[\w:.-]*Value>/i);
+  const message = faultstring || reason || '(SOAP Fault — no faultstring/Reason found)';
+  const label = faultcode || code || '';
+  return { message, label };
+}
+
 function looksLikeXml(body, headers) {
   for (const [k, values] of Object.entries(headers || {})) {
     if (k.toLowerCase() === 'content-type' && /xml/i.test(values.join(','))) return true;
@@ -1425,6 +1494,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('#authType').onchange = (e) => { currentRequest.auth.type = e.target.value; renderAuthFields(); };
   $('#bodyMode').onchange = (e) => { currentRequest.body.mode = e.target.value; renderBodyFields(); };
+  $('#soapVersion').onchange = () => {
+    // Switching version swaps which template "Insert envelope" offers, but
+    // don't clobber a body someone already wrote.
+  };
+  $('#soapInsertEnvelope').onclick = () => {
+    if ($('#bodyRaw').value.trim() && !confirm('Replace the current body with a blank SOAP envelope template?')) return;
+    $('#bodyRaw').value = SOAP_ENVELOPE_TEMPLATES[$('#soapVersion').value] || SOAP_ENVELOPE_TEMPLATES['1.1'];
+    checkSoapWellFormed();
+  };
+  $('#soapFormatXml').onclick = () => {
+    try {
+      $('#bodyRaw').value = formatXml($('#bodyRaw').value);
+    } catch (_) { /* leave as-is if it doesn't parse */ }
+    checkSoapWellFormed();
+  };
+  $('#bodyRaw').addEventListener('input', () => { if (currentRequest.body.mode === 'soap') checkSoapWellFormed(); });
   $('#modalOverlay').onclick = (e) => { if (e.target === $('#modalOverlay')) closeModal(); };
 
   renderRequestForm();

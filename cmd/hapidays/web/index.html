@@ -99,13 +99,32 @@
         <option value="urlencoded">x-www-form-urlencoded</option>
         <option value="formdata">Form Data</option>
         <option value="graphql">GraphQL</option>
+        <option value="soap">SOAP</option>
       </select>
       <select id="bodyLanguage">
         <option value="json">JSON</option>
         <option value="xml">XML</option>
         <option value="text">Text</option>
       </select>
+      <div id="soapFields" class="hidden">
+        <div class="field-row">
+          <label>SOAP Version</label>
+          <select id="soapVersion">
+            <option value="1.1">1.1 (SOAPAction header)</option>
+            <option value="1.2">1.2 (action in Content-Type)</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label>SOAPAction</label>
+          <input type="text" id="soapAction" placeholder="http://tempuri.org/Add">
+        </div>
+        <div class="btn-row">
+          <button id="soapInsertEnvelope" type="button">Insert envelope</button>
+          <button id="soapFormatXml" type="button">Format XML</button>
+        </div>
+      </div>
       <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
+      <div id="bodyRawHint" class="hint hidden"></div>
       <div id="bodyUrlEncodedTable" class="kv-table hidden"></div>
       <button class="add-row hidden" id="addUrlEncodedRow" data-target="urlencoded">+ Add field</button>
       <div id="bodyFormDataTable" class="kv-table hidden"></div>

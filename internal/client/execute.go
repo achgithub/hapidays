@@ -275,6 +275,8 @@ func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) 
 	switch body.Mode {
 	case model.BodyRaw, model.BodyGraphQL:
 		return []byte(Resolve(body.Raw, vars)), rawLanguageToContentType(body.RawLanguage), nil
+	case model.BodySoap:
+		return []byte(Resolve(body.Raw, vars)), soapContentType(body, vars), nil
 	case model.BodyURLEncoded:
 		form := url.Values{}
 		for _, kv := range body.URLEncoded {
@@ -307,6 +309,21 @@ func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) 
 	return nil, "", nil
 }
 
+// soapContentType computes the Content-Type per the SOAP 1.1/1.2 standards.
+// SOAP 1.1 carries the action in a separate SOAPAction header (set in
+// buildRequest); SOAP 1.2 embeds it as an `action` parameter on the
+// Content-Type itself and has no SOAPAction header at all.
+func soapContentType(body model.Body, vars map[string]string) string {
+	if body.SoapVersion == "1.2" {
+		ct := "application/soap+xml; charset=utf-8"
+		if action := Resolve(body.SoapAction, vars); action != "" {
+			ct += `; action="` + action + `"`
+		}
+		return ct
+	}
+	return "text/xml; charset=utf-8"
+}
+
 func buildRequest(ctx context.Context, spec model.RequestSpec, rawURL string, vars map[string]string, bodyBytes []byte, contentType string) (*http.Request, error) {
 	var bodyReader io.Reader
 	if len(bodyBytes) > 0 {
@@ -326,6 +343,13 @@ func buildRequest(ctx context.Context, spec model.RequestSpec, rawURL string, va
 	}
 	if contentType != "" && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	// SOAP 1.1 requires SOAPAction as its own header (quoted, and still
+	// present-but-empty when there's no action — RFC-shaped like `""`, never
+	// omitted). SOAP 1.2 has no such header; the action lives in
+	// Content-Type's `action` param instead (see soapContentType).
+	if spec.Body.Mode == model.BodySoap && spec.Body.SoapVersion != "1.2" && req.Header.Get("SOAPAction") == "" {
+		req.Header.Set("SOAPAction", `"`+Resolve(spec.Body.SoapAction, vars)+`"`)
 	}
 
 	applyAuth(req, spec.Auth, vars, bodyBytes)
