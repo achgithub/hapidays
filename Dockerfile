@@ -1,9 +1,10 @@
 # Build-only image: compiles hapidays for every target OS/arch and leaves
 # the binaries in /out. Nothing here runs at container runtime — this is
 # purely a cross-compiler since there's no local Go toolchain.
-FROM golang:1.22-bookworm AS build
+FROM golang:1.23-bookworm AS build
 WORKDIR /src
-COPY go.mod ./
+COPY go.mod go.sum ./
+RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 ENV CGO_ENABLED=0

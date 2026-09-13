@@ -452,6 +452,7 @@ function renderRequestForm() {
   $('#wsSecurityMode').value = currentRequest.body.wsSecurityMode || '';
   $('#wsSecurityUsername').value = currentRequest.body.wsSecurityUsername || '';
   $('#wsSecurityPassword').value = currentRequest.body.wsSecurityPassword || '';
+  $('#signBody').checked = !!currentRequest.body.signBody;
   renderBodyFields();
 
   $('#preScriptView').value = currentRequest.preRequestScript || '';
@@ -792,6 +793,7 @@ function collectFormIntoRequest() {
   currentRequest.body.wsSecurityMode = $('#wsSecurityMode').value;
   currentRequest.body.wsSecurityUsername = $('#wsSecurityUsername').value;
   currentRequest.body.wsSecurityPassword = $('#wsSecurityPassword').value;
+  currentRequest.body.signBody = $('#signBody').checked;
   return currentRequest;
 }
 

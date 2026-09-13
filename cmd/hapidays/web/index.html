@@ -137,6 +137,11 @@
           <p class="hint">Inserted into &lt;soap:Header&gt; at send time (not stored in the body text) — PasswordDigest is
           generated fresh per request since it's time-bound (Nonce + Created), so it won't match if you inspect the raw body above.</p>
         </div>
+        <div class="field-row">
+          <label><input type="checkbox" id="signBody"> Sign body (X.509)</label>
+        </div>
+        <p class="hint">XML-signs &lt;soap:Body&gt; using the client certificate configured in Settings (the same one
+        used for mutual TLS). Inserts a &lt;ds:Signature&gt; into the WS-Security header at send time.</p>
       </div>
       <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
       <div id="bodyRawHint" class="hint hidden"></div>

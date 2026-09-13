@@ -6,6 +6,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto"
 	crand "crypto/rand"
 	"crypto/sha1"
 	"crypto/tls"
@@ -23,6 +24,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/beevik/etree"
+	dsig "github.com/russellhaering/goxmldsig"
 
 	"hapidays/internal/model"
 	"hapidays/internal/store"
@@ -170,7 +174,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	rawURL := Resolve(spec.URLRaw, vars)
 	rawURL = applyQueryParams(rawURL, spec.Query, vars)
 
-	bodyBytes, contentType, err := buildBody(spec.Body, vars)
+	bodyBytes, contentType, err := buildBody(spec.Body, vars, opts.Settings)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +277,7 @@ func applyQueryParams(rawURL string, query []model.KV, vars map[string]string) s
 	return base + "?" + q.Encode()
 }
 
-func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) {
+func buildBody(body model.Body, vars map[string]string, settings store.Settings) ([]byte, string, error) {
 	switch body.Mode {
 	case model.BodyRaw, model.BodyGraphQL:
 		return []byte(Resolve(body.Raw, vars)), rawLanguageToContentType(body.RawLanguage), nil
@@ -281,6 +285,16 @@ func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) 
 		envelope := Resolve(body.Raw, vars)
 		if body.WsSecurityMode != "" {
 			envelope = insertWsSecurityHeader(envelope, body.WsSecurityMode, Resolve(body.WsSecurityUsername, vars), Resolve(body.WsSecurityPassword, vars))
+		}
+		if body.SignBody {
+			if settings.ClientCertFile == "" || settings.ClientKeyFile == "" {
+				return nil, "", fmt.Errorf("this request has \"Sign body (X.509)\" enabled but no client certificate is configured — set one in Settings (the same cert used for mutual TLS)")
+			}
+			signed, err := signSoapBody(envelope, settings.ClientCertFile, settings.ClientKeyFile)
+			if err != nil {
+				return nil, "", fmt.Errorf("sign SOAP body: %w", err)
+			}
+			envelope = signed
 		}
 		return []byte(envelope), soapContentType(body, vars), nil
 	case model.BodyURLEncoded:
@@ -393,6 +407,112 @@ func insertWsSecurityHeader(envelope, mode, username, password string) string {
 	// than guessing; the user will see the request fail auth server-side,
 	// which is a clearer signal than a header silently going nowhere.
 	return envelope
+}
+
+// signSoapBody implements WS-Security X.509 message signing: it XML-signs
+// the soap:Body (RSA-SHA256 over the exclusive-C14N-canonicalized element)
+// and inserts the resulting <ds:Signature> into wsse:Security in the
+// header, referencing the Body by a wsu:Id.
+//
+// Unlike insertWsSecurityHeader (string splicing, used for UsernameToken),
+// this parses the envelope with etree rather than treating it as text.
+// That's not a style choice — canonicalization operates on the parsed,
+// namespace-resolved element tree, so the bytes that get digested and the
+// bytes that get sent must come from the same parse. Splicing a signature
+// into text after the fact would sign one representation and send another.
+func signSoapBody(envelope, certFile, keyFile string) (string, error) {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return "", fmt.Errorf("load signing cert/key: %w", err)
+	}
+	signer, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return "", fmt.Errorf("configured signing key does not support XML signing")
+	}
+
+	doc := etree.NewDocument()
+	if err := doc.ReadFromString(envelope); err != nil {
+		return "", fmt.Errorf("parse envelope for signing: %w", err)
+	}
+	root := doc.Root()
+	if root == nil {
+		return "", fmt.Errorf("empty envelope")
+	}
+
+	body := findChildByLocal(root, "Body")
+	if body == nil {
+		return "", fmt.Errorf("no soap:Body element found to sign")
+	}
+	if body.SelectAttrValue("Id", "") == "" {
+		body.CreateAttr("xmlns:wsu", wsuNS)
+		body.CreateAttr("wsu:Id", "Body-1")
+	}
+	// goxmldsig's exclusive-C14N pass canonicalizes starting from a fresh,
+	// empty namespace context — it doesn't walk up to ancestors the way
+	// NSBuildParentContext (used elsewhere in ConstructSignature) does. The
+	// envelope's own soap: prefix is declared once, on the root Envelope,
+	// so Body's tag (soap:Body) would otherwise reference an "undeclared"
+	// prefix from the canonicalizer's point of view. Inlining the
+	// declaration directly onto Body — a redundant but harmless
+	// declaration in plain XML terms — makes it resolvable without one.
+	if envNS := root.SelectAttrValue("xmlns:"+root.Space, ""); envNS != "" {
+		if body.SelectAttrValue("xmlns:"+root.Space, "") == "" {
+			body.CreateAttr("xmlns:"+root.Space, envNS)
+		}
+	}
+
+	ctx, err := dsig.NewSigningContext(signer, [][]byte{cert.Certificate[0]})
+	if err != nil {
+		return "", fmt.Errorf("create signing context: %w", err)
+	}
+	ctx.IdAttribute = "Id" // matches wsu:Id — etree matches attr keys namespace-agnostically when the lookup key has no prefix
+	ctx.Canonicalizer = dsig.MakeC14N10ExclusiveCanonicalizerWithPrefixList("")
+
+	// enveloped=false: the signature is going into the header, not inside
+	// the Body it signs, so the enveloped-signature transform (which
+	// exists to let a verifier strip a Signature that's a *descendant* of
+	// the signed element before canonicalizing) doesn't apply here.
+	sigEl, err := ctx.ConstructSignature(body, false)
+	if err != nil {
+		return "", fmt.Errorf("construct XML signature: %w", err)
+	}
+
+	security := findOrCreateSecurityHeader(root)
+	security.AddChild(sigEl)
+
+	out, err := doc.WriteToString()
+	if err != nil {
+		return "", fmt.Errorf("serialize signed envelope: %w", err)
+	}
+	return out, nil
+}
+
+func findChildByLocal(parent *etree.Element, local string) *etree.Element {
+	for _, c := range parent.ChildElements() {
+		if c.Tag == local {
+			return c
+		}
+	}
+	return nil
+}
+
+// findOrCreateSecurityHeader mirrors insertWsSecurityHeader's three cases
+// (existing Header, none at all) but operates on the parsed tree — used
+// when signing runs without a prior UsernameToken having already spliced a
+// Header/Security in as text.
+func findOrCreateSecurityHeader(envelope *etree.Element) *etree.Element {
+	header := findChildByLocal(envelope, "Header")
+	if header == nil {
+		header = etree.NewElement(envelope.Space + ":Header")
+		envelope.InsertChildAt(0, header) // Header must precede Body
+	}
+	security := findChildByLocal(header, "Security")
+	if security == nil {
+		security = header.CreateElement("wsse:Security")
+		security.CreateAttr("xmlns:wsse", wsseNS)
+		security.CreateAttr(envelope.Space+":mustUnderstand", "1")
+	}
+	return security
 }
 
 // soapContentType computes the Content-Type per the SOAP 1.1/1.2 standards.

@@ -69,6 +69,12 @@ type Body struct {
 	WsSecurityMode     string `json:"wsSecurityMode,omitempty"`
 	WsSecurityUsername string `json:"wsSecurityUsername,omitempty"`
 	WsSecurityPassword string `json:"wsSecurityPassword,omitempty"`
+	// SignBody, when true, XML-signs the SOAP Body (WS-Security X.509
+	// message signing) using the client certificate configured in
+	// Settings — the same one used for mutual TLS. Only the on/off flag
+	// lives here; the cert/key paths stay in Settings so a private key
+	// path never ends up in collection JSON.
+	SignBody bool `json:"signBody,omitempty"`
 }
 
 // Capture is our own (non-Postman) feature: after a response comes back,
