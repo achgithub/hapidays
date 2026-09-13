@@ -333,9 +333,38 @@ function loadRequestIntoForm(req) {
   renderRequestForm();
 }
 
+// Explicit port field: some people expect one (SoapUI/older Postman
+// style) rather than editing "https://host:port/path" as one string.
+// There's no separate `port` field in the data model — this just reads
+// and rewrites the :port segment of urlRaw, so it works with everything
+// already built around a single URL string (vars, captures, history).
+// Matches "scheme://host" up to the first /, :, ?, or # — the {{var}}
+// tokens in a templated host (e.g. "{{baseUrl}}") don't contain any of
+// those characters, so this holds even when the host itself is a
+// variable, as long as it isn't the whole authority that's templated
+// (e.g. a URL that's just "{{fullBaseUrlWithScheme}}/path" has no literal
+// authority for the field to attach a port to, and is left alone).
+const URL_AUTHORITY_RE = /^(https?:\/\/[^/:?#]+)(:(\d+))?/;
+
+function syncPortFieldFromUrl() {
+  const m = $('#urlInput').value.match(URL_AUTHORITY_RE);
+  $('#portInput').value = (m && m[3]) || '';
+}
+
+function applyPortFieldToUrl() {
+  const url = $('#urlInput').value;
+  const m = url.match(URL_AUTHORITY_RE);
+  if (!m) return; // no recognizable scheme://host prefix to attach a port to
+  const port = $('#portInput').value.trim();
+  const newUrl = (port ? `${m[1]}:${port}` : m[1]) + url.slice(m[0].length);
+  $('#urlInput').value = newUrl;
+  currentRequest.urlRaw = newUrl;
+}
+
 function renderRequestForm() {
   $('#methodSelect').value = currentRequest.method || 'GET';
   $('#urlInput').value = currentRequest.urlRaw || '';
+  syncPortFieldFromUrl();
   renderKVTable('paramsTable', currentRequest.query || (currentRequest.query = []));
   renderKVTable('headersTable', currentRequest.headers || (currentRequest.headers = []));
   renderCapturesTable();
@@ -1150,6 +1179,8 @@ window.addEventListener('unhandledrejection', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;
+  $('#urlInput').oninput = () => { currentRequest.urlRaw = $('#urlInput').value; syncPortFieldFromUrl(); };
+  $('#portInput').oninput = applyPortFieldToUrl;
 
   $('#importCollectionBtn').onclick = () => $('#importCollectionInput').click();
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);

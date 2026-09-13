@@ -108,6 +108,7 @@ button, input, select, textarea { font-family: inherit; font-size: 13px; }
 .main { flex: 1; display: flex; flex-direction: column; padding: 12px; overflow-y: auto; }
 .request-bar { display: flex; gap: 6px; margin-bottom: 10px; }
 #urlInput { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: ui-monospace, monospace; }
+#portInput { width: 64px; flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: ui-monospace, monospace; }
 #methodSelect { font-weight: 700; }
 
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
