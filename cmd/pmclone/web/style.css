@@ -144,6 +144,8 @@ label { font-size: 12px; color: var(--text-dim); }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; }
 .modal { background: var(--bg); border-radius: 8px; padding: 16px; width: 480px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
 .modal h3 { margin-top: 0; }
+.modal h4 { margin: 16px 0 4px; font-size: 13px; border-top: 1px solid var(--border); padding-top: 12px; }
+.modal h4:first-of-type { border-top: none; padding-top: 0; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 
 #stepLog { max-height: 50vh; overflow-y: auto; margin: 8px 0; }

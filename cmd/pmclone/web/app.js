@@ -52,12 +52,12 @@ function renderCollectionList() {
     run.onclick = (e) => { e.stopPropagation(); openRunModal(col.id, null, col.name); };
     actions.appendChild(run);
 
-    const auth = document.createElement('span');
-    auth.className = 'col-action';
-    auth.textContent = '🔑';
-    auth.title = 'Collection auth (used by requests set to "Inherit from collection")';
-    auth.onclick = (e) => { e.stopPropagation(); openCollectionAuthModal(col.id); };
-    actions.appendChild(auth);
+    const settings = document.createElement('span');
+    settings.className = 'col-action';
+    settings.textContent = '⚙';
+    settings.title = 'Collection settings (variables & auth)';
+    settings.onclick = (e) => { e.stopPropagation(); openCollectionSettingsModal(col.id); };
+    actions.appendChild(settings);
 
     const del = document.createElement('span');
     del.className = 'col-action col-action-danger';
@@ -167,15 +167,26 @@ async function persistCollectionTree() {
 // The auth a request set to "Inherit from collection" falls back to.
 // There's no per-folder auth in this model, so the collection is the only
 // thing a request can inherit from.
-async function openCollectionAuthModal(collectionId) {
+// Collection-level settings that otherwise had no UI at all — Variables
+// (Collection.Variables) was only ever set by the Postman importer or a
+// raw API call, same gap Collection Auth had before it got this modal.
+async function openCollectionSettingsModal(collectionId) {
   const col = (state.currentCollection && state.currentCollection.id === collectionId)
     ? state.currentCollection
     : await api(`/collections/${collectionId}`);
+  const variables = JSON.parse(JSON.stringify(col.variables || []));
   const auth = col.auth && col.auth.type ? JSON.parse(JSON.stringify(col.auth)) : { type: 'none', params: {} };
   if (!auth.params) auth.params = {};
 
   showModal(`
-    <h3>Collection auth — ${escapeHtml(col.name)}</h3>
+    <h3>Collection settings — ${escapeHtml(col.name)}</h3>
+
+    <h4>Variables</h4>
+    <p class="hint">Available as {{key}} to every request in this collection.</p>
+    <div id="colVarsTable" class="kv-table"></div>
+    <button class="add-row" id="colVarsAddRow">+ Add variable</button>
+
+    <h4>Auth</h4>
     <p class="hint">Used by any request in this collection set to "Inherit from collection".</p>
     <div class="field-row"><label>Type</label>
       <select id="colAuthType">
@@ -189,18 +200,25 @@ async function openCollectionAuthModal(collectionId) {
       </select>
     </div>
     <div id="colAuthFields" class="kv-table"></div>
+
     <div class="modal-actions">
-      <button id="colAuthCancel">Cancel</button>
-      <button id="colAuthSave" style="background:var(--accent);color:#fff">Save</button>
+      <button id="colSettingsCancel">Cancel</button>
+      <button id="colSettingsSave" style="background:var(--accent);color:#fff">Save</button>
     </div>
   `);
 
-  const rerender = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerender);
+  const renderVars = () => renderKVTable('colVarsTable', variables);
+  renderVars();
+  $('#colVarsAddRow').onclick = () => { variables.push({ key: '', value: '', disabled: false }); renderVars(); };
+
+  const rerenderAuth = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerenderAuth);
   $('#colAuthType').value = auth.type;
-  rerender();
-  $('#colAuthType').onchange = (e) => { auth.type = e.target.value; rerender(); };
-  $('#colAuthCancel').onclick = closeModal;
-  $('#colAuthSave').onclick = async () => {
+  rerenderAuth();
+  $('#colAuthType').onchange = (e) => { auth.type = e.target.value; rerenderAuth(); };
+
+  $('#colSettingsCancel').onclick = closeModal;
+  $('#colSettingsSave').onclick = async () => {
+    col.variables = variables;
     col.auth = auth;
     const saved = await api(`/collections/${col.id}`, { method: 'PUT', body: JSON.stringify(col) });
     if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = saved;
