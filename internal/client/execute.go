@@ -104,7 +104,10 @@ type Options struct {
 	CollectionAuth model.Auth
 }
 
-func buildHTTPClient(opts Options) (*http.Client, error) {
+// buildTLSConfig builds the TLS config shared by the HTTP client and (for
+// gRPC, which has no http.Transport) credentials.NewTLS — mTLS cert, extra
+// CA, and skip-verify all apply the same way regardless of transport.
+func buildTLSConfig(opts Options) (*tls.Config, error) {
 	tlsCfg := &tls.Config{}
 
 	skipVerify := opts.Settings.InsecureSkipVerify
@@ -134,6 +137,14 @@ func buildHTTPClient(opts Options) (*http.Client, error) {
 			return nil, fmt.Errorf("load client cert/key: %w", err)
 		}
 		tlsCfg.Certificates = []tls.Certificate{cert}
+	}
+	return tlsCfg, nil
+}
+
+func buildHTTPClient(opts Options) (*http.Client, error) {
+	tlsCfg, err := buildTLSConfig(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	transport := &http.Transport{

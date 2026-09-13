@@ -52,7 +52,13 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 				URL:       client.Resolve(node.Request.URLRaw, vars),
 			}
 			step.AssertionsPassed = true
-			result, err := client.Execute(ctx, *node.Request, vars, opts.Client)
+			var result *client.Result
+			var err error
+			if node.Request.Body.Mode == model.BodyGRPC {
+				result, err = client.ExecuteGRPC(ctx, *node.Request, vars, opts.Client)
+			} else {
+				result, err = client.Execute(ctx, *node.Request, vars, opts.Client)
+			}
 			switch {
 			case err != nil:
 				step.Error = err.Error()

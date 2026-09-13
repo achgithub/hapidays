@@ -21,6 +21,7 @@ import (
 	"hapidays/internal/client"
 	"hapidays/internal/curlconv"
 	"hapidays/internal/graphqlintro"
+	"hapidays/internal/grpcintro"
 	"hapidays/internal/importer"
 	"hapidays/internal/model"
 	"hapidays/internal/oauth2"
@@ -53,6 +54,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/wsdl/import", s.originGuard(s.importWSDL))
 	s.mux.HandleFunc("POST /api/odata/import", s.originGuard(s.importOData))
 	s.mux.HandleFunc("POST /api/graphql/import", s.originGuard(s.importGraphQL))
+	s.mux.HandleFunc("POST /api/grpc/import", s.originGuard(s.importGRPC))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
 	s.mux.HandleFunc("PUT /api/collections/{id}", s.originGuard(s.saveCollection))
 	s.mux.HandleFunc("DELETE /api/collections/{id}", s.originGuard(s.deleteCollection))
@@ -368,6 +370,42 @@ func (s *Server) importGraphQL(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, col)
 }
 
+// importGRPC connects to a gRPC server's reflection service and builds a
+// collection with one request per unary method (streaming methods are
+// listed as skipped rather than silently turned into a broken request).
+func (s *Server) importGRPC(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Target    string `json:"target"`
+		Plaintext bool   `json:"plaintext"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if req.Target == "" {
+		writeErr(w, 400, fmt.Errorf("a gRPC target (host:port) is required"))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	res, err := grpcintro.Import(ctx, req.Target, req.Plaintext, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	res.Collection.UpdatedAt = time.Now()
+	if err := s.store.SaveCollection(res.Collection); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"collection": res.Collection,
+		"skipped":    res.Skipped,
+	})
+}
+
 func (s *Server) getCollection(w http.ResponseWriter, r *http.Request) {
 	col, err := s.store.LoadCollection(r.PathValue("id"))
 	if err != nil {
@@ -554,12 +592,18 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 65*time.Second)
 	defer cancel()
 
-	result, err := client.Execute(ctx, req.Request, vars, client.Options{
+	sendOpts := client.Options{
 		Settings:           settings,
 		InsecureSkipVerify: req.InsecureSkipVerify,
 		Cookies:            s.store,
 		CollectionAuth:     s.collectionAuth(req.CollectionID),
-	})
+	}
+	var result *client.Result
+	if req.Request.Body.Mode == model.BodyGRPC {
+		result, err = client.ExecuteGRPC(ctx, req.Request, vars, sendOpts)
+	} else {
+		result, err = client.Execute(ctx, req.Request, vars, sendOpts)
+	}
 	if err != nil {
 		writeErr(w, 500, err)
 		return

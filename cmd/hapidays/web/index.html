@@ -16,6 +16,7 @@
         <button id="importWsdlBtn" title="Import a WSDL (upload a file or fetch by URL)">Import WSDL</button>
         <button id="importODataBtn" title="Import an OData service from its $metadata URL">Import OData</button>
         <button id="importGraphQLBtn" title="Import a GraphQL API via schema introspection">Import GraphQL</button>
+        <button id="importGRPCBtn" title="Import a gRPC service via server reflection (unary methods only)">Import gRPC</button>
         <button id="importCurlBtn" title="Paste a curl command (e.g. browser devtools' Copy as cURL) to create a request">Import cURL</button>
         <button id="newCollectionBtn" title="New empty collection">New</button>
       </div>
@@ -51,17 +52,22 @@
 
   <main class="main">
     <div class="request-bar">
-      <select id="methodSelect">
-        <option>GET</option><option>POST</option><option>PUT</option>
-        <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
-      </select>
-      <select id="protocolSelect" title="Disabled when Domain is a {{variable}} — assumed to already include the scheme">
-        <option value="https">https://</option>
-        <option value="http">http://</option>
-      </select>
-      <input id="domainInput" type="text" placeholder="api.example.com or {{baseUrl}}">
-      <input id="portInput" type="text" placeholder="port">
-      <input id="pathInput" type="text" placeholder="/v1/resource">
+      <div id="httpUrlBar" class="url-bar">
+        <select id="methodSelect">
+          <option>GET</option><option>POST</option><option>PUT</option>
+          <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+        </select>
+        <select id="protocolSelect" title="Disabled when Domain is a {{variable}} — assumed to already include the scheme">
+          <option value="https">https://</option>
+          <option value="http">http://</option>
+        </select>
+        <input id="domainInput" type="text" placeholder="api.example.com or {{baseUrl}}">
+        <input id="portInput" type="text" placeholder="port">
+        <input id="pathInput" type="text" placeholder="/v1/resource">
+      </div>
+      <div id="grpcUrlBar" class="url-bar hidden">
+        <span class="hint">gRPC target and method are set in the Body tab.</span>
+      </div>
       <button id="sendBtn">Send</button>
       <button id="saveRequestBtn" title="Save changes back to the collection">Save</button>
       <button id="copyAsCurlBtn" title="Show this request as a curl command">cURL</button>
@@ -106,6 +112,7 @@
         <option value="formdata">Form Data</option>
         <option value="graphql">GraphQL</option>
         <option value="soap">SOAP</option>
+        <option value="grpc">gRPC</option>
       </select>
       <select id="bodyLanguage">
         <option value="json">JSON</option>
@@ -147,6 +154,24 @@
         </div>
         <p class="hint">XML-signs &lt;soap:Body&gt; using the client certificate configured in Settings (the same one
         used for mutual TLS). Inserts a &lt;ds:Signature&gt; into the WS-Security header at send time.</p>
+      </div>
+      <div id="grpcFields" class="hidden">
+        <div class="field-row">
+          <label>Target (host:port)</label>
+          <input type="text" id="grpcTarget" placeholder="localhost:50051">
+        </div>
+        <div class="field-row">
+          <label><input type="checkbox" id="grpcPlaintext"> Plaintext (h2c, no TLS)</label>
+        </div>
+        <div class="field-row">
+          <label>Full method</label>
+          <input type="text" id="grpcFullMethod" placeholder="/package.Service/Method">
+        </div>
+        <p class="hint">Request JSON goes in the body editor below (protojson — field names are the message's proto3
+        field names). Metadata is gRPC metadata, not HTTP headers, so it's kept in its own table.</p>
+        <label>Metadata</label>
+        <div id="grpcMetadataTable" class="kv-table"></div>
+        <button class="add-row" data-target="grpcMetadata">+ Add metadata</button>
       </div>
       <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
       <div id="bodyRawHint" class="hint hidden"></div>

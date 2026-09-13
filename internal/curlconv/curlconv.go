@@ -230,6 +230,15 @@ func tokenize(s string) ([]string, error) {
 // mirroring Execute's own resolution — curl has no concept of "inherit
 // from collection".
 func Export(spec model.RequestSpec, vars map[string]string, collectionAuth model.Auth) string {
+	if spec.Body.Mode == model.BodyGRPC {
+		method := ""
+		if spec.Body.GRPC != nil {
+			method = spec.Body.GRPC.FullMethod
+		}
+		return "# gRPC calls aren't HTTP requests and can't be reproduced as a curl command — use grpcurl instead, e.g.:\n" +
+			"# grpcurl -plaintext <target> " + method
+	}
+
 	if spec.Auth.Type == model.AuthInherit {
 		spec.Auth = collectionAuth
 	}

@@ -44,6 +44,7 @@ const (
 	BodyFormData   BodyMode = "formdata"
 	BodyGraphQL    BodyMode = "graphql"
 	BodySoap       BodyMode = "soap"
+	BodyGRPC       BodyMode = "grpc"
 )
 
 type FormField struct {
@@ -75,6 +76,32 @@ type Body struct {
 	// lives here; the cert/key paths stay in Settings so a private key
 	// path never ends up in collection JSON.
 	SignBody bool `json:"signBody,omitempty"`
+
+	// GRPC carries the call details when Mode == grpc. gRPC isn't an HTTP
+	// body — this struct is a fully separate call description, dispatched
+	// by client.ExecuteGRPC instead of the HTTP path (see execute.go).
+	GRPC *GRPCCall `json:"grpc,omitempty"`
+}
+
+// GRPCCall describes one unary gRPC call, as produced by the reflection
+// importer (internal/grpcintro) or hand-edited afterward.
+type GRPCCall struct {
+	// Target is host:port — no scheme. grpc.NewClient rejects a scheme
+	// prefix, so this is stripped at import time and should stay stripped.
+	Target string `json:"target"`
+	// Plaintext selects h2c (no TLS) — an explicit toggle, never guessed
+	// from the target string, since gRPC has no equivalent of a URL scheme.
+	Plaintext bool `json:"plaintext"`
+	// FullMethod is "/package.Service/Method" (leading slash, dots between
+	// package/service/method) — the exact form grpc.Invoke expects, not
+	// the "package.Service.Method" shape reflection symbols come back as.
+	FullMethod string `json:"fullMethod"`
+	// RequestJSON is the request message rendered via protojson, edited
+	// like any other JSON body.
+	RequestJSON string `json:"requestJson"`
+	// Metadata is outgoing gRPC metadata — kept separate from Headers
+	// since gRPC metadata isn't literally the HTTP Headers tab.
+	Metadata []KV `json:"metadata,omitempty"`
 }
 
 // Capture is our own (non-Postman) feature: after a response comes back,

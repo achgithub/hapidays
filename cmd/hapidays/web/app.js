@@ -453,7 +453,9 @@ function renderRequestForm() {
 
   $('#bodyMode').value = currentRequest.body.mode || 'none';
   $('#bodyLanguage').value = currentRequest.body.rawLanguage || 'json';
-  $('#bodyRaw').value = currentRequest.body.raw || '';
+  $('#bodyRaw').value = currentRequest.body.mode === 'grpc'
+    ? ((currentRequest.body.grpc && currentRequest.body.grpc.requestJson) || '')
+    : (currentRequest.body.raw || '');
   $('#soapVersion').value = currentRequest.body.soapVersion || '1.1';
   $('#soapAction').value = currentRequest.body.soapAction || '';
   $('#wsSecurityMode').value = currentRequest.body.wsSecurityMode || '';
@@ -754,11 +756,15 @@ function renderBodyFields() {
   // the envelope XML) but swaps the language picker for SOAP-specific
   // controls (version, SOAPAction, envelope template) since the language
   // is always XML.
-  const isRawLike = mode === 'raw' || mode === 'graphql' || mode === 'soap';
+  const isGrpc = mode === 'grpc';
+  const isRawLike = mode === 'raw' || mode === 'graphql' || mode === 'soap' || isGrpc;
   const isSoap = mode === 'soap';
   $('#bodyRaw').classList.toggle('hidden', !isRawLike);
-  $('#bodyLanguage').classList.toggle('hidden', !isRawLike || isSoap);
+  $('#bodyLanguage').classList.toggle('hidden', !isRawLike || isSoap || isGrpc);
   $('#soapFields').classList.toggle('hidden', !isSoap);
+  $('#grpcFields').classList.toggle('hidden', !isGrpc);
+  $('#httpUrlBar').classList.toggle('hidden', isGrpc);
+  $('#grpcUrlBar').classList.toggle('hidden', !isGrpc);
   $('#bodyUrlEncodedTable').classList.toggle('hidden', mode !== 'urlencoded');
   $('#addUrlEncodedRow').classList.toggle('hidden', mode !== 'urlencoded');
   $('#bodyFormDataTable').classList.toggle('hidden', mode !== 'formdata');
@@ -772,10 +778,20 @@ function renderBodyFields() {
   if (isSoap) {
     currentRequest.body.rawLanguage = 'xml';
     checkSoapWellFormed();
+  } else if (isGrpc) {
+    currentRequest.body.rawLanguage = 'json';
+    $('#bodyRawHint').classList.add('hidden');
   } else {
     $('#bodyRawHint').classList.add('hidden');
   }
   $('#wsSecurityCreds').classList.toggle('hidden', !isSoap || !$('#wsSecurityMode').value);
+  if (isGrpc) {
+    const grpc = currentRequest.body.grpc || (currentRequest.body.grpc = { target: '', plaintext: false, fullMethod: '', metadata: [] });
+    $('#grpcTarget').value = grpc.target || '';
+    $('#grpcPlaintext').checked = !!grpc.plaintext;
+    $('#grpcFullMethod').value = grpc.fullMethod || '';
+    renderKVTable('grpcMetadataTable', grpc.metadata || (grpc.metadata = []));
+  }
 }
 
 // Fast, local feedback before a round-trip: is the body even well-formed
@@ -852,10 +868,19 @@ function renderFormDataTable() {
 }
 
 function collectFormIntoRequest() {
-  currentRequest.method = $('#methodSelect').value;
+  // The method select has no GRPC option (it's an HTTP verb list) — for a
+  // gRPC request, leave currentRequest.method as whatever the importer set
+  // ("GRPC") rather than clobbering it with GET/POST from a select the
+  // gRPC UI hides.
+  const bodyMode = $('#bodyMode').value;
+  if (bodyMode !== 'grpc') {
+    currentRequest.method = $('#methodSelect').value;
+  } else if (currentRequest.method !== 'GRPC') {
+    currentRequest.method = 'GRPC';
+  }
   // urlRaw is kept live-updated by composeUrlFromFields() on every
   // Protocol/Domain/Port/Path edit — nothing to re-read here.
-  currentRequest.body.mode = $('#bodyMode').value;
+  currentRequest.body.mode = bodyMode;
   currentRequest.body.rawLanguage = $('#bodyLanguage').value;
   currentRequest.body.raw = $('#bodyRaw').value;
   currentRequest.body.soapVersion = $('#soapVersion').value;
@@ -864,6 +889,13 @@ function collectFormIntoRequest() {
   currentRequest.body.wsSecurityUsername = $('#wsSecurityUsername').value;
   currentRequest.body.wsSecurityPassword = $('#wsSecurityPassword').value;
   currentRequest.body.signBody = $('#signBody').checked;
+  if (currentRequest.body.mode === 'grpc') {
+    const grpc = currentRequest.body.grpc || (currentRequest.body.grpc = {});
+    grpc.target = $('#grpcTarget').value;
+    grpc.plaintext = $('#grpcPlaintext').checked;
+    grpc.fullMethod = $('#grpcFullMethod').value;
+    grpc.requestJson = $('#bodyRaw').value;
+  }
   return currentRequest;
 }
 
@@ -1690,6 +1722,40 @@ function openGraphQLImportModal() {
   };
 }
 
+// ---------- gRPC reflection import ----------
+
+function openGRPCImportModal() {
+  showModal(`
+    <h3>Import gRPC service</h3>
+    <p class="hint">Connects to the target and lists services/methods via server reflection — one request per
+    unary method, request JSON pre-filled with a field skeleton. Streaming methods are listed but not imported
+    (hapidays only sends unary calls).</p>
+    <div class="field-row"><label>Target (host:port)</label><input type="text" id="grpcImportTarget" placeholder="localhost:50051"></div>
+    <div class="field-row"><label><input type="checkbox" id="grpcImportPlaintext"> Plaintext (h2c, no TLS)</label></div>
+    <div class="modal-actions">
+      <button id="grpcImportCancel">Cancel</button>
+      <button id="grpcImportGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  $('#grpcImportCancel').onclick = closeModal;
+  $('#grpcImportGo').onclick = async () => {
+    const target = $('#grpcImportTarget').value.trim();
+    if (!target) { alert('Provide the gRPC target (host:port).'); return; }
+    const plaintext = $('#grpcImportPlaintext').checked;
+    try {
+      const res = await api('/grpc/import', { method: 'POST', body: JSON.stringify({ target, plaintext }) });
+      await loadCollections();
+      closeModal();
+      if (res.skipped && res.skipped.length) {
+        alert('Imported. Skipped ' + res.skipped.length + ' streaming method(s) — hapidays only supports unary gRPC calls:\n'
+          + res.skipped.map(s => `${s.fullMethod} (${s.reason})`).join('\n'));
+      }
+    } catch (e) {
+      alert('gRPC import failed: ' + e.message);
+    }
+  };
+}
+
 // ---------- XML pretty-printing ----------
 
 // detectSoapFault finds a SOAP Fault regardless of HTTP status — a fault is
@@ -1784,6 +1850,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importWsdlBtn').onclick = openWsdlImportModal;
   $('#importODataBtn').onclick = openODataImportModal;
   $('#importGraphQLBtn').onclick = openGraphQLImportModal;
+  $('#importGRPCBtn').onclick = openGRPCImportModal;
   $('#importCurlBtn').onclick = openCurlImportModal;
   $('#copyAsCurlBtn').onclick = openCurlExportModal;
 
@@ -1841,6 +1908,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = currentRequest.body.formData || (currentRequest.body.formData = []);
         list.push({ key: '', value: '', type: 'text', disabled: false });
         renderFormDataTable();
+      }
+      if (target === 'grpcMetadata') {
+        const grpc = currentRequest.body.grpc || (currentRequest.body.grpc = { target: '', plaintext: false, fullMethod: '', metadata: [] });
+        const list = grpc.metadata || (grpc.metadata = []);
+        list.push({ key: '', value: '', disabled: false });
+        renderKVTable('grpcMetadataTable', list);
       }
     };
   });
