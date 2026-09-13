@@ -1,0 +1,257 @@
+{
+  "name": "pmclone smoke test",
+  "variables": [
+    { "key": "baseHttpbin", "value": "https://httpbin.org" },
+    { "key": "baseJsonPlaceholder", "value": "https://jsonplaceholder.typicode.com" },
+    { "key": "baseGraphQL", "value": "https://countries.trevorblades.com" }
+  ],
+  "auth": {
+    "type": "basic",
+    "params": { "username": "pmclone", "password": "test123" }
+  },
+  "root": [
+    {
+      "id": "folder-auth",
+      "name": "1. Auth types",
+      "children": [
+        {
+          "id": "auth-basic",
+          "name": "Basic Auth (explicit)",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/basic-auth/pmclone/test123",
+            "auth": { "type": "basic", "params": { "username": "pmclone", "password": "test123" } },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-digest",
+          "name": "Digest Auth",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/digest-auth/auth/pmclone/test123",
+            "auth": { "type": "digest", "params": { "username": "pmclone", "password": "test123" } },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-bearer",
+          "name": "Bearer Token",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/bearer",
+            "auth": { "type": "bearer", "params": { "token": "anytoken123" } },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-apikey-header",
+          "name": "API Key - Header",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/headers",
+            "auth": { "type": "apikey", "params": { "key": "X-API-Key", "value": "demo-key-123", "in": "header" } },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-apikey-query",
+          "name": "API Key - Query Param",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/get",
+            "auth": { "type": "apikey", "params": { "key": "apikey", "value": "demo-key-123", "in": "query" } },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-awsv4",
+          "name": "AWS SigV4 (smoke only — no real AWS creds, just checks the signer doesn't crash)",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/get",
+            "auth": {
+              "type": "awsv4",
+              "params": {
+                "accessKey": "AKIAEXAMPLE00000000",
+                "secretKey": "exampleSecretKeyDoesNotNeedToBeReal",
+                "region": "us-east-1",
+                "service": "execute-api"
+              }
+            },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-oauth2",
+          "name": "OAuth 2.0 Client Credentials (click Get New Access Token in the Auth tab first)",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/bearer",
+            "auth": {
+              "type": "oauth2",
+              "params": {
+                "grantType": "client_credentials",
+                "accessTokenUrl": "https://demo.duendesoftware.com/connect/token",
+                "clientId": "m2m",
+                "clientSecret": "secret",
+                "scope": "api"
+              }
+            },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-inherit",
+          "name": "Inherit From Collection (uses collection's Basic auth)",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/basic-auth/pmclone/test123",
+            "auth": { "type": "inherit" },
+            "body": { "mode": "none" }
+          }
+        },
+        {
+          "id": "auth-none-override",
+          "name": "Explicit No Auth (should 401 — proves it does NOT fall back to collection auth)",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/basic-auth/pmclone/test123",
+            "auth": { "type": "none" },
+            "body": { "mode": "none" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "folder-body",
+      "name": "2. Body modes",
+      "children": [
+        {
+          "id": "body-raw-json",
+          "name": "Raw JSON",
+          "request": {
+            "method": "POST",
+            "urlRaw": "{{baseHttpbin}}/post",
+            "auth": { "type": "inherit" },
+            "body": { "mode": "raw", "raw": "{\n  \"hello\": \"world\",\n  \"n\": 1\n}", "rawLanguage": "json" }
+          }
+        },
+        {
+          "id": "body-raw-xml",
+          "name": "Raw XML",
+          "request": {
+            "method": "POST",
+            "urlRaw": "{{baseHttpbin}}/post",
+            "auth": { "type": "inherit" },
+            "body": { "mode": "raw", "raw": "<note><to>pmclone</to><body>smoke test</body></note>", "rawLanguage": "xml" }
+          }
+        },
+        {
+          "id": "body-raw-text",
+          "name": "Raw Text",
+          "request": {
+            "method": "POST",
+            "urlRaw": "{{baseHttpbin}}/post",
+            "auth": { "type": "inherit" },
+            "body": { "mode": "raw", "raw": "just a plain text body", "rawLanguage": "text" }
+          }
+        },
+        {
+          "id": "body-urlencoded",
+          "name": "URL Encoded Form",
+          "request": {
+            "method": "POST",
+            "urlRaw": "{{baseHttpbin}}/post",
+            "auth": { "type": "inherit" },
+            "body": { "mode": "urlencoded", "urlEncoded": [{ "key": "foo", "value": "bar" }, { "key": "baz", "value": "qux" }] }
+          }
+        },
+        {
+          "id": "body-formdata",
+          "name": "Multipart Form Data",
+          "request": {
+            "method": "POST",
+            "urlRaw": "{{baseHttpbin}}/post",
+            "auth": { "type": "inherit" },
+            "body": { "mode": "formdata", "formData": [{ "key": "field1", "value": "value1", "type": "text" }] }
+          }
+        },
+        {
+          "id": "body-graphql",
+          "name": "GraphQL Query",
+          "request": {
+            "method": "POST",
+            "urlRaw": "{{baseGraphQL}}/",
+            "auth": { "type": "none" },
+            "body": { "mode": "graphql", "raw": "{\"query\":\"{ country(code: \\\"GB\\\") { name capital currency } }\"}", "rawLanguage": "json" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "folder-status",
+      "name": "3. Status codes & errors",
+      "children": [
+        { "id": "status-200", "name": "200 OK", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/status/200", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "status-404", "name": "404 Not Found", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/status/404", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "status-500", "name": "500 Server Error", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/status/500", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "status-redirect", "name": "3x Redirect chain", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/redirect/3", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "status-delay", "name": "Delayed response (3s)", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/delay/3", "auth": { "type": "none" }, "body": { "mode": "none" } } }
+      ]
+    },
+    {
+      "id": "folder-cookies",
+      "name": "4. Cookies (run these two in order)",
+      "children": [
+        { "id": "cookies-set", "name": "1) Set a cookie", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/cookies/set?smoke=pmclone123", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "cookies-read", "name": "2) Read cookies back (should show smoke=pmclone123)", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/cookies", "auth": { "type": "none" }, "body": { "mode": "none" } } }
+      ]
+    },
+    {
+      "id": "folder-capture",
+      "name": "5. Variable capture (run these two in order)",
+      "children": [
+        {
+          "id": "capture-get-uuid",
+          "name": "1) Get a UUID (captures it into {{capturedUuid}})",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/uuid",
+            "auth": { "type": "none" },
+            "body": { "mode": "none" },
+            "captures": [{ "source": "body_json", "from": "uuid", "intoVar": "capturedUuid" }]
+          }
+        },
+        {
+          "id": "capture-use-uuid",
+          "name": "2) Use captured UUID (path should echo the same uuid)",
+          "request": {
+            "method": "GET",
+            "urlRaw": "{{baseHttpbin}}/anything/{{capturedUuid}}",
+            "auth": { "type": "none" },
+            "body": { "mode": "none" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "folder-rendering",
+      "name": "6. Response rendering",
+      "children": [
+        { "id": "render-xml", "name": "XML response (pretty-print check)", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/xml", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "render-binary", "name": "Binary response (PNG)", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/image/png", "auth": { "type": "none" }, "body": { "mode": "none" } } }
+      ]
+    },
+    {
+      "id": "folder-runner",
+      "name": "7. Collection runner target (try the ▶ Run button on this folder)",
+      "children": [
+        { "id": "runner-post-1", "name": "Post 1", "request": { "method": "GET", "urlRaw": "{{baseJsonPlaceholder}}/posts/1", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "runner-post-2", "name": "Post 2", "request": { "method": "GET", "urlRaw": "{{baseJsonPlaceholder}}/posts/2", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "runner-post-3", "name": "Post 3", "request": { "method": "GET", "urlRaw": "{{baseJsonPlaceholder}}/posts/3", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "runner-post-404", "name": "Post 999 (should 404)", "request": { "method": "GET", "urlRaw": "{{baseJsonPlaceholder}}/posts/999", "auth": { "type": "none" }, "body": { "mode": "none" } } }
+      ]
+    }
+  ]
+}
