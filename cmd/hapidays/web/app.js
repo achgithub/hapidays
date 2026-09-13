@@ -449,6 +449,9 @@ function renderRequestForm() {
   $('#bodyRaw').value = currentRequest.body.raw || '';
   $('#soapVersion').value = currentRequest.body.soapVersion || '1.1';
   $('#soapAction').value = currentRequest.body.soapAction || '';
+  $('#wsSecurityMode').value = currentRequest.body.wsSecurityMode || '';
+  $('#wsSecurityUsername').value = currentRequest.body.wsSecurityUsername || '';
+  $('#wsSecurityPassword').value = currentRequest.body.wsSecurityPassword || '';
   renderBodyFields();
 
   $('#preScriptView').value = currentRequest.preRequestScript || '';
@@ -701,6 +704,7 @@ function renderBodyFields() {
   } else {
     $('#bodyRawHint').classList.add('hidden');
   }
+  $('#wsSecurityCreds').classList.toggle('hidden', !isSoap || !$('#wsSecurityMode').value);
 }
 
 // Fast, local feedback before a round-trip: is the body even well-formed
@@ -785,6 +789,9 @@ function collectFormIntoRequest() {
   currentRequest.body.raw = $('#bodyRaw').value;
   currentRequest.body.soapVersion = $('#soapVersion').value;
   currentRequest.body.soapAction = $('#soapAction').value;
+  currentRequest.body.wsSecurityMode = $('#wsSecurityMode').value;
+  currentRequest.body.wsSecurityUsername = $('#wsSecurityUsername').value;
+  currentRequest.body.wsSecurityPassword = $('#wsSecurityPassword').value;
   return currentRequest;
 }
 
@@ -1497,6 +1504,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#soapVersion').onchange = () => {
     // Switching version swaps which template "Insert envelope" offers, but
     // don't clobber a body someone already wrote.
+  };
+  $('#wsSecurityMode').onchange = () => {
+    $('#wsSecurityCreds').classList.toggle('hidden', !$('#wsSecurityMode').value);
   };
   $('#soapInsertEnvelope').onclick = () => {
     if ($('#bodyRaw').value.trim() && !confirm('Replace the current body with a blank SOAP envelope template?')) return;

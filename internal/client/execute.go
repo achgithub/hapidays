@@ -6,6 +6,8 @@ package client
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -276,7 +278,11 @@ func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) 
 	case model.BodyRaw, model.BodyGraphQL:
 		return []byte(Resolve(body.Raw, vars)), rawLanguageToContentType(body.RawLanguage), nil
 	case model.BodySoap:
-		return []byte(Resolve(body.Raw, vars)), soapContentType(body, vars), nil
+		envelope := Resolve(body.Raw, vars)
+		if body.WsSecurityMode != "" {
+			envelope = insertWsSecurityHeader(envelope, body.WsSecurityMode, Resolve(body.WsSecurityUsername, vars), Resolve(body.WsSecurityPassword, vars))
+		}
+		return []byte(envelope), soapContentType(body, vars), nil
 	case model.BodyURLEncoded:
 		form := url.Values{}
 		for _, kv := range body.URLEncoded {
@@ -307,6 +313,86 @@ func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) 
 		return buf.Bytes(), mw.FormDataContentType(), nil
 	}
 	return nil, "", nil
+}
+
+const (
+	wsseNS           = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+	wsuNS            = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+	passwordTextURI  = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText"
+	passwordDigestURI = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest"
+	base64BinaryURI  = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary"
+)
+
+var (
+	headerOpenCloseRe = regexp.MustCompile(`(?is)(<[\w.-]*:?Header[^>]*>)(.*?)(</[\w.-]*:?Header>)`)
+	headerSelfCloseRe = regexp.MustCompile(`(?is)<[\w.-]*:?Header\s*/>`)
+	envelopeOpenRe    = regexp.MustCompile(`(?is)(<[\w.-]*:?Envelope\b[^>]*>)`)
+)
+
+// buildUsernameTokenXML implements the OASIS WS-Security UsernameToken
+// Profile 1.0: PasswordText sends the password as-is (relies on transport
+// security); PasswordDigest sends
+// Base64(SHA1(decode_base64(Nonce) ++ utf8(Created) ++ utf8(Password))) so
+// the plaintext password never crosses the wire, at the cost of Created
+// having to be within the server's clock-skew tolerance (commonly ~5 min) —
+// which is why this runs at send time in Go, never precomputed client-side.
+func buildUsernameTokenXML(mode, username, password string) string {
+	if mode == "passwordDigest" {
+		nonce := make([]byte, 16)
+		_, _ = crand.Read(nonce)
+		nonceB64 := base64.StdEncoding.EncodeToString(nonce)
+		created := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+		h := sha1.New()
+		h.Write(nonce)
+		h.Write([]byte(created))
+		h.Write([]byte(password))
+		digest := base64.StdEncoding.EncodeToString(h.Sum(nil))
+		return fmt.Sprintf(`<wsse:Security xmlns:wsse="%s" soap:mustUnderstand="1">
+      <wsse:UsernameToken xmlns:wsu="%s">
+        <wsse:Username>%s</wsse:Username>
+        <wsse:Password Type="%s">%s</wsse:Password>
+        <wsse:Nonce EncodingType="%s">%s</wsse:Nonce>
+        <wsu:Created>%s</wsu:Created>
+      </wsse:UsernameToken>
+    </wsse:Security>`, wsseNS, wsuNS, xmlEscape(username), passwordDigestURI, digest, base64BinaryURI, nonceB64, created)
+	}
+	return fmt.Sprintf(`<wsse:Security xmlns:wsse="%s" soap:mustUnderstand="1">
+      <wsse:UsernameToken xmlns:wsu="%s">
+        <wsse:Username>%s</wsse:Username>
+        <wsse:Password Type="%s">%s</wsse:Password>
+      </wsse:UsernameToken>
+    </wsse:Security>`, wsseNS, wsuNS, xmlEscape(username), passwordTextURI, xmlEscape(password))
+}
+
+func xmlEscape(s string) string {
+	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
+	return r.Replace(s)
+}
+
+// insertWsSecurityHeader splices a wsse:Security block into the envelope's
+// soap:Header. Never re-serializes the envelope with encoding/xml — that
+// mangles namespace prefixes on round-trip — so this is string surgery,
+// same approach and same prefix-agnostic matching as detectSoapFault in
+// app.js. Three cases: an existing open/close Header (insert before the
+// close), a self-closing <soap:Header/> (expand it), or no Header element
+// at all (insert one right after the Envelope's opening tag).
+func insertWsSecurityHeader(envelope, mode, username, password string) string {
+	token := buildUsernameTokenXML(mode, username, password)
+	if m := headerOpenCloseRe.FindStringSubmatchIndex(envelope); m != nil {
+		insertAt := m[5] // start of the closing tag capture group
+		return envelope[:insertAt] + "  " + token + "\n    " + envelope[insertAt:]
+	}
+	if loc := headerSelfCloseRe.FindStringIndex(envelope); loc != nil {
+		return envelope[:loc[0]] + "<soap:Header>\n    " + token + "\n  </soap:Header>" + envelope[loc[1]:]
+	}
+	if m := envelopeOpenRe.FindStringSubmatchIndex(envelope); m != nil {
+		insertAt := m[1] // end of the opening Envelope tag
+		return envelope[:insertAt] + "\n  <soap:Header>\n    " + token + "\n  </soap:Header>" + envelope[insertAt:]
+	}
+	// No recognizable Envelope at all — leave the body untouched rather
+	// than guessing; the user will see the request fail auth server-side,
+	// which is a clearer signal than a header silently going nowhere.
+	return envelope
 }
 
 // soapContentType computes the Content-Type per the SOAP 1.1/1.2 standards.

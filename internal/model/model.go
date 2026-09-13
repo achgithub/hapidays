@@ -61,6 +61,14 @@ type Body struct {
 	FormData    []FormField `json:"formData,omitempty"`
 	SoapVersion string      `json:"soapVersion,omitempty"` // "1.1" | "1.2" — only used when Mode == soap
 	SoapAction  string      `json:"soapAction,omitempty"`  // only used when Mode == soap
+	// WS-Security UsernameToken (only used when Mode == soap). Mode is
+	// "" (off) | "passwordText" | "passwordDigest". The password is stored
+	// the same way a Basic-auth password already is — plaintext in this
+	// collection's JSON — never send anything more sensitive (a private
+	// key) through these fields.
+	WsSecurityMode     string `json:"wsSecurityMode,omitempty"`
+	WsSecurityUsername string `json:"wsSecurityUsername,omitempty"`
+	WsSecurityPassword string `json:"wsSecurityPassword,omitempty"`
 }
 
 // Capture is our own (non-Postman) feature: after a response comes back,

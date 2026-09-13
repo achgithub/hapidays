@@ -122,6 +122,20 @@
           <button id="soapInsertEnvelope" type="button">Insert envelope</button>
           <button id="soapFormatXml" type="button">Format XML</button>
         </div>
+        <div class="field-row">
+          <label>WS-Security</label>
+          <select id="wsSecurityMode">
+            <option value="">None</option>
+            <option value="passwordText">UsernameToken — PasswordText</option>
+            <option value="passwordDigest">UsernameToken — PasswordDigest</option>
+          </select>
+        </div>
+        <div id="wsSecurityCreds" class="hidden">
+          <div class="field-row"><label>Username</label><input type="text" id="wsSecurityUsername"></div>
+          <div class="field-row"><label>Password</label><input type="password" id="wsSecurityPassword"></div>
+          <p class="hint">Inserted into &lt;soap:Header&gt; at send time (not stored in the body text) — PasswordDigest is
+          generated fresh per request since it's time-bound (Nonce + Created), so it won't match if you inspect the raw body above.</p>
+        </div>
       </div>
       <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
       <div id="bodyRawHint" class="hint hidden"></div>
