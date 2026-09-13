@@ -7,12 +7,14 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 	"hapidays/internal/model"
 	"hapidays/internal/oauth2"
 	"hapidays/internal/odata"
+	"hapidays/internal/odatabatch"
 	"hapidays/internal/runner"
 	"hapidays/internal/store"
 	"hapidays/internal/wsdl"
@@ -72,6 +75,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/cookies/{domain}/{name}", s.originGuard(s.deleteCookie))
 
 	s.mux.HandleFunc("POST /api/run", s.originGuard(s.runCollection))
+	s.mux.HandleFunc("POST /api/odata/batch", s.originGuard(s.odataBatch))
 
 	s.mux.HandleFunc("POST /api/oauth2/token", s.originGuard(s.oauth2Token))
 	s.mux.HandleFunc("POST /api/oauth2/authorize/start", s.originGuard(s.oauth2AuthorizeStart))
@@ -697,6 +701,172 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	writeJSON(w, 200, results)
+}
+
+// ---- OData $batch ----
+
+type batchRequest struct {
+	CollectionID  string `json:"collectionId"`
+	FolderID      string `json:"folderId,omitempty"` // empty = every request in the collection
+	EnvironmentID string `json:"environmentId,omitempty"`
+	BatchURL      string `json:"batchUrl"` // e.g. {{baseUrl}}/$batch, resolved before use
+}
+
+type batchStepResult struct {
+	NodeID  string              `json:"nodeId"`
+	Name    string              `json:"name"`
+	Method  string              `json:"method"`
+	URL     string              `json:"url"`
+	Status  int                 `json:"status"`
+	Headers map[string][]string `json:"headers,omitempty"`
+	Body    string              `json:"body"`
+	Error   string              `json:"error,omitempty"`
+}
+
+// odataBatch bundles every request under a folder (or the whole
+// collection) into one OData $batch call and returns the individual
+// sub-responses. Building the sub-requests goes through client.PrepareRequest
+// — the same resolution (vars, auth, body) a normal /api/send uses — so a
+// batched request behaves exactly like it would sent on its own, just
+// bundled onto the wire as one HTTP call.
+func (s *Server) odataBatch(w http.ResponseWriter, r *http.Request) {
+	var req batchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if req.BatchURL == "" {
+		writeErr(w, 400, fmt.Errorf("a $batch URL is required"))
+		return
+	}
+	col, err := s.store.LoadCollection(req.CollectionID)
+	if err != nil {
+		writeErr(w, 404, err)
+		return
+	}
+	nodes := col.Root
+	if req.FolderID != "" {
+		folder := runner.FindNode(col.Root, req.FolderID)
+		if folder == nil {
+			writeErr(w, 404, fmt.Errorf("folder %q not found in collection", req.FolderID))
+			return
+		}
+		nodes = folder.Children
+	}
+	leaves := runner.Flatten(nodes)
+	if len(leaves) == 0 {
+		writeErr(w, 400, fmt.Errorf("no requests found to batch"))
+		return
+	}
+
+	settings, err := s.store.LoadSettings()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	settings = s.settingsForEnvironment(settings, req.EnvironmentID)
+	vars := s.resolveVars(req.CollectionID, req.EnvironmentID)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+
+	clientOpts := client.Options{Settings: settings, Cookies: s.store, CollectionAuth: col.Auth}
+	httpReqs := make([]*http.Request, 0, len(leaves))
+	for _, leaf := range leaves {
+		hr, err := client.PrepareRequest(ctx, *leaf.Request, vars, clientOpts)
+		if err != nil {
+			writeErr(w, 400, fmt.Errorf("preparing %q: %w", leaf.Name, err))
+			return
+		}
+		httpReqs = append(httpReqs, hr)
+	}
+
+	batchURL := client.Resolve(req.BatchURL, vars)
+	parsedBatchURL, err := url.Parse(batchURL)
+	if err != nil {
+		writeErr(w, 400, fmt.Errorf("invalid $batch URL: %w", err))
+		return
+	}
+	servicePath := strings.TrimSuffix(parsedBatchURL.Path, "/$batch")
+
+	body, contentType, err := odatabatch.Build(httpReqs, servicePath)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+
+	httpClient, err := client.NewHTTPClient(clientOpts)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	outerReq, err := http.NewRequestWithContext(ctx, http.MethodPost, batchURL, bytes.NewReader(body))
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	outerReq.Header.Set("Content-Type", contentType)
+	applyAuthForBatch(outerReq, col.Auth, vars)
+
+	resp, err := httpClient.Do(outerReq)
+	if err != nil {
+		writeErr(w, 502, fmt.Errorf("$batch request failed: %w", err))
+		return
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	if resp.StatusCode >= 300 {
+		writeErr(w, 502, fmt.Errorf("$batch endpoint returned HTTP %d: %s", resp.StatusCode, string(respBody)))
+		return
+	}
+
+	results, err := odatabatch.Parse(resp.Header.Get("Content-Type"), respBody)
+	if err != nil {
+		writeErr(w, 502, fmt.Errorf("parsing $batch response: %w", err))
+		return
+	}
+
+	out := make([]batchStepResult, len(leaves))
+	for i, leaf := range leaves {
+		out[i] = batchStepResult{NodeID: leaf.ID, Name: leaf.Name, Method: leaf.Request.Method, URL: client.Resolve(leaf.Request.URLRaw, vars)}
+		if i < len(results) {
+			out[i].Status = results[i].Status
+			out[i].Headers = results[i].Headers
+			out[i].Body = results[i].Body
+		} else {
+			out[i].Error = "no matching sub-response returned by the server"
+		}
+	}
+	writeJSON(w, 200, out)
+}
+
+// applyAuthForBatch puts the collection's own auth on the outer $batch
+// HTTP call — the $batch endpoint itself commonly requires the same auth
+// as the data endpoints, same reasoning as importOData fetching $metadata
+// through client.Execute rather than a bare fetch. Only the common,
+// directly-representable-as-a-header cases are handled (Basic/Bearer/API
+// key); anything else (digest, AWS SigV4, OAuth2) would need a full
+// request/response round trip of its own to apply correctly, which a
+// single outer POST doesn't provide room for.
+func applyAuthForBatch(req *http.Request, auth model.Auth, vars map[string]string) {
+	switch auth.Type {
+	case model.AuthBasic:
+		req.SetBasicAuth(client.Resolve(auth.Params["username"], vars), client.Resolve(auth.Params["password"], vars))
+	case model.AuthBearer:
+		req.Header.Set("Authorization", "Bearer "+client.Resolve(auth.Params["token"], vars))
+	case model.AuthAPIKey:
+		if auth.Params["in"] == "query" {
+			q := req.URL.Query()
+			q.Set(client.Resolve(auth.Params["key"], vars), client.Resolve(auth.Params["value"], vars))
+			req.URL.RawQuery = q.Encode()
+		} else {
+			req.Header.Set(client.Resolve(auth.Params["key"], vars), client.Resolve(auth.Params["value"], vars))
+		}
+	}
 }
 
 // ---- oauth2 ----

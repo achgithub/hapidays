@@ -27,7 +27,7 @@ type Options struct {
 // and the run continues, matching how a smoke-test pass over many
 // endpoints is normally used.
 func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStepResult {
-	requests := flatten(nodes)
+	requests := Flatten(nodes)
 
 	iterations := 1
 	if len(opts.DataRows) > 0 {
@@ -81,14 +81,18 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 	return results
 }
 
-func flatten(nodes []*model.Node) []*model.Node {
+// Flatten walks nodes depth-first and returns every request leaf, in tree
+// order — the same traversal Run uses, exported so other callers (the
+// OData $batch handler) can build the same "every request under this
+// folder" selection without a second copy of the walk.
+func Flatten(nodes []*model.Node) []*model.Node {
 	var out []*model.Node
 	for _, n := range nodes {
 		if n.Request != nil {
 			out = append(out, n)
 			continue
 		}
-		out = append(out, flatten(n.Children)...)
+		out = append(out, Flatten(n.Children)...)
 	}
 	return out
 }

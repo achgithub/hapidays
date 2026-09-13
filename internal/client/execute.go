@@ -160,6 +160,34 @@ func buildHTTPClient(opts Options) (*http.Client, error) {
 	}}, nil
 }
 
+// NewHTTPClient exposes buildHTTPClient for callers that need the same
+// TLS/proxy/mTLS-aware client this package uses internally but want to
+// send something other than a single Execute-shaped request — e.g. an
+// OData $batch request, which is one HTTP call carrying several bundled
+// sub-requests in its body.
+func NewHTTPClient(opts Options) (*http.Client, error) {
+	return buildHTTPClient(opts)
+}
+
+// PrepareRequest resolves spec into a ready-to-send, fully-built
+// *http.Request — variables substituted, query params merged, body built
+// (including SOAP/WS-Security), auth applied — without sending it. Used by
+// OData $batch to bundle several already-resolved requests into one HTTP
+// call; Execute itself doesn't use this since it also needs the digest-auth
+// retry path, which re-resolves the body for the second request.
+func PrepareRequest(ctx context.Context, spec model.RequestSpec, vars map[string]string, opts Options) (*http.Request, error) {
+	if spec.Auth.Type == model.AuthInherit {
+		spec.Auth = opts.CollectionAuth
+	}
+	rawURL := Resolve(spec.URLRaw, vars)
+	rawURL = applyQueryParams(rawURL, spec.Query, vars)
+	bodyBytes, contentType, err := buildBody(spec.Body, vars, opts.Settings)
+	if err != nil {
+		return nil, err
+	}
+	return buildRequest(ctx, spec, rawURL, vars, bodyBytes, contentType)
+}
+
 // Execute resolves variables into spec, sends the request, and applies any
 // Capture rules against the response. It never runs Postman pre-
 // request/test scripts (spec.PreRequestScript / TestScript) — those are

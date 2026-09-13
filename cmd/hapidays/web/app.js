@@ -249,6 +249,12 @@ function renderNodes(nodes, path, container) {
       run.title = 'Run this folder';
       run.onclick = (e) => { e.stopPropagation(); openRunModal(state.currentCollection.id, node.id, node.name); };
       actions.appendChild(run);
+      const batch = document.createElement('span');
+      batch.className = 'col-action';
+      batch.textContent = '⛁';
+      batch.title = 'Send this folder as one OData $batch request';
+      batch.onclick = (e) => { e.stopPropagation(); openBatchModal(state.currentCollection.id, node.id, node.name); };
+      actions.appendChild(batch);
       const rename = document.createElement('span');
       rename.className = 'col-action';
       rename.textContent = '✎';
@@ -1118,6 +1124,70 @@ function openRunModal(collectionId, folderId, label) {
       $('#runStart').textContent = 'Run';
     }
   };
+}
+
+// ---------- OData $batch ----------
+
+function openBatchModal(collectionId, folderId, label) {
+  // If this collection came from the OData importer, "baseUrl" already
+  // holds the service root — batchUrl is almost always just that + /$batch.
+  const baseVar = (state.currentCollection.variables || []).find(v => v.key === 'baseUrl');
+  const guessedBatchUrl = baseVar ? baseVar.value.replace(/\/$/, '') + '/$batch' : '';
+
+  showModal(`
+    <h3>Send as $batch: ${escapeHtml(label)}</h3>
+    <p class="hint">Bundles every request in this folder into one OData $batch HTTP call (multipart/mixed —
+    GET requests sent directly, everything else wrapped in its own changeset) and shows the individual
+    sub-responses.</p>
+    <div class="field-row"><label>$batch URL</label><input type="text" id="batchUrlInput" value="${escapeAttr(guessedBatchUrl)}" placeholder="{{baseUrl}}/\$batch"></div>
+    <div class="modal-actions">
+      <button id="batchCancel">Cancel</button>
+      <button id="batchStart" style="background:var(--accent);color:#fff">Send</button>
+    </div>
+    <div id="batchResults"></div>
+  `);
+  $('#batchCancel').onclick = closeModal;
+  $('#batchStart').onclick = async () => {
+    const batchUrl = $('#batchUrlInput').value.trim();
+    if (!batchUrl) { alert('Enter the $batch URL.'); return; }
+    $('#batchStart').disabled = true;
+    $('#batchStart').textContent = 'Sending…';
+    try {
+      const results = await api('/odata/batch', {
+        method: 'POST',
+        body: JSON.stringify({ collectionId, folderId: folderId || undefined, environmentId: state.currentEnvironmentId, batchUrl }),
+      });
+      renderBatchResults(results);
+    } catch (e) {
+      $('#batchResults').textContent = 'Batch failed: ' + e.message;
+    } finally {
+      $('#batchStart').disabled = false;
+      $('#batchStart').textContent = 'Send';
+    }
+  };
+}
+
+function renderBatchResults(results) {
+  const passCount = results.filter(r => !r.error && r.status >= 200 && r.status < 300).length;
+  const container = $('#batchResults');
+  container.innerHTML = '';
+  const summary = document.createElement('p');
+  summary.textContent = `${passCount}/${results.length} sub-requests returned 2xx`;
+  container.appendChild(summary);
+  const table = document.createElement('div');
+  table.className = 'kv-table';
+  results.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'kv-row';
+    const ok = !r.error && r.status >= 200 && r.status < 300;
+    const bodyPreview = (r.body || '').slice(0, 300);
+    row.innerHTML = `<div style="flex:1">
+      <div style="color:${ok ? 'var(--ok)' : 'var(--danger)'}">${escapeHtml(r.method)} ${escapeHtml(r.error || String(r.status))} · ${escapeHtml(r.name)}</div>
+      <pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;margin:4px 0 0">${escapeHtml(bodyPreview)}</pre>
+    </div>`;
+    table.appendChild(row);
+  });
+  container.appendChild(table);
 }
 
 function renderRunResults(results) {
