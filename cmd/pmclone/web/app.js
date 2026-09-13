@@ -333,43 +333,93 @@ function loadRequestIntoForm(req) {
   renderRequestForm();
 }
 
-// Explicit port field: some people expect one (SoapUI/older Postman
-// style) rather than editing "https://host:port/path" as one string.
-// There's no separate `port` field in the data model — this just reads
-// and rewrites the :port segment of urlRaw, so it works with everything
-// already built around a single URL string (vars, captures, history).
+// ---------- URL bar: Protocol / Domain / Port / Path fields ----------
 //
-// Matches either a literal "scheme://host" prefix, or — the far more
-// common real case, since most collections use a {{baseUrl}}-style
-// variable rather than a literal host per request — a single leading
-// {{var}} token standing in for the whole authority (e.g. the smoke-test
-// collection's "{{baseHttpbin}}/basic-auth/..."). Either way, an optional
-// :port right after it is captured. Resolve() substitutes the {{var}}
-// token with its literal value before sending, so "{{baseHttpbin}}:1111/x"
-// resolves to "https://httpbin.org:1111/x" — the concatenation works out
-// at send time even though the port sits after an unresolved token here.
-const URL_AUTHORITY_RE = /^((?:https?:\/\/[^/:?#]+)|(?:\{\{[^}]+\}\}))(:(\d+))?/;
+// Rather than editing "https://host:port/path?query" as one string (and
+// having a port field try to live-parse-and-rewrite that string, which
+// turned out fragile — e.g. it silently did nothing when the host was a
+// bare {{var}} token, since a regex trying to spot "http(s)://" found
+// nothing to anchor on), the URL bar is four independent fields that
+// only ever compose FORWARD into urlRaw. Decomposition only happens once,
+// when a request is loaded — not continuously on every keystroke — which
+// is what actually makes this robust: a one-shot best-effort parse with a
+// visible "did this round-trip correctly?" preview underneath, rather
+// than a live parser that has to get every edge case right on every
+// keypress or silently misbehave.
+//
+// Path never contains "?..." — the Query Params tab is the sole source
+// of query params (see applyQueryParams in internal/client/execute.go);
+// any literal query string found in a loaded request's URL gets folded
+// into that tab once, on load, then dropped from the composed URL.
+const URL_DECOMPOSE_RE = /^(?:(https?):\/\/)?([^/:?#]+)?(?::(\d+))?([^?#]*)(?:\?([^#]*))?/;
 
-function syncPortFieldFromUrl() {
-  const m = $('#urlInput').value.match(URL_AUTHORITY_RE);
-  $('#portInput').value = (m && m[3]) || '';
+// True when the domain is a single {{var}} token — treated as already
+// carrying its own scheme (e.g. {{baseUrl}} = "https://api.example.com"),
+// so Protocol is disabled rather than double-prepended.
+function domainIsVariable(domain) {
+  return domain.trim().startsWith('{{');
 }
 
-function applyPortFieldToUrl() {
-  const url = $('#urlInput').value;
-  const m = url.match(URL_AUTHORITY_RE);
-  if (!m) return; // no recognizable scheme://host prefix to attach a port to
+function updateProtocolFieldState() {
+  const isVar = domainIsVariable($('#domainInput').value);
+  $('#protocolSelect').disabled = isVar;
+}
+
+// Rebuilds currentRequest.urlRaw from the four fields (never includes a
+// query string — that's the Query Params tab's job) and refreshes the
+// human-facing preview, which DOES include Query Params, so it shows
+// what will truly be sent, not just what's in urlRaw.
+function composeUrlFromFields() {
+  const domain = $('#domainInput').value.trim();
   const port = $('#portInput').value.trim();
-  const newUrl = (port ? `${m[1]}:${port}` : m[1]) + url.slice(m[0].length);
-  $('#urlInput').value = newUrl;
-  currentRequest.urlRaw = newUrl;
+  const path = $('#pathInput').value;
+  updateProtocolFieldState();
+
+  let url = domainIsVariable(domain) ? domain : (domain ? `${$('#protocolSelect').value}://${domain}` : '');
+  if (port) url += `:${port}`;
+  url += path;
+  currentRequest.urlRaw = url;
+  refreshFullUrlPreview();
+}
+
+function refreshFullUrlPreview() {
+  let preview = currentRequest.urlRaw || '';
+  const enabledQuery = (currentRequest.query || []).filter(kv => !kv.disabled && kv.key);
+  if (enabledQuery.length) {
+    const qs = enabledQuery.map(kv => `${encodeURIComponent(kv.key)}=${encodeURIComponent(kv.value)}`).join('&');
+    preview += (preview.includes('?') ? '&' : '?') + qs;
+  }
+  $('#fullUrlPreview').textContent = preview || '(empty URL)';
+}
+
+// Splits a loaded request's urlRaw into the four fields, folding any
+// literal query string into the Query Params list (dedup'd by key+value,
+// so re-loading the same request repeatedly can't pile up duplicates).
+function loadUrlFieldsFromRequest() {
+  const raw = currentRequest.urlRaw || '';
+  const m = raw.match(URL_DECOMPOSE_RE) || [];
+  const [, protocol, domain, port, path, query] = m;
+
+  if (query) {
+    const existing = currentRequest.query || (currentRequest.query = []);
+    for (const [key, value] of new URLSearchParams(query).entries()) {
+      if (!existing.some(kv => kv.key === key && kv.value === value)) {
+        existing.push({ key, value, disabled: false });
+      }
+    }
+  }
+
+  $('#protocolSelect').value = protocol || 'https';
+  $('#domainInput').value = domain || '';
+  $('#portInput').value = port || '';
+  $('#pathInput').value = path || '';
+  composeUrlFromFields(); // also strips any leftover literal "?..." from urlRaw now that it's in Query Params
 }
 
 function renderRequestForm() {
   $('#methodSelect').value = currentRequest.method || 'GET';
-  $('#urlInput').value = currentRequest.urlRaw || '';
-  syncPortFieldFromUrl();
-  renderKVTable('paramsTable', currentRequest.query || (currentRequest.query = []));
+  loadUrlFieldsFromRequest();
+  renderKVTable('paramsTable', currentRequest.query || (currentRequest.query = []), refreshFullUrlPreview);
   renderKVTable('headersTable', currentRequest.headers || (currentRequest.headers = []));
   renderCapturesTable();
 
@@ -385,7 +435,7 @@ function renderRequestForm() {
   $('#testScriptView').value = currentRequest.testScript || '';
 }
 
-function renderKVTable(containerId, list) {
+function renderKVTable(containerId, list, onChange) {
   const container = $('#' + containerId);
   container.innerHTML = '';
   list.forEach((kv, i) => {
@@ -397,10 +447,10 @@ function renderKVTable(containerId, list) {
       <input type="text" placeholder="Value" value="${escapeAttr(kv.value)}">
       <button class="remove-row" title="Remove">×</button>`;
     const [chk, keyInput, valInput] = row.querySelectorAll('input');
-    chk.onchange = () => { kv.disabled = !chk.checked; };
-    keyInput.oninput = () => { kv.key = keyInput.value; };
-    valInput.oninput = () => { kv.value = valInput.value; };
-    row.querySelector('.remove-row').onclick = () => { list.splice(i, 1); renderKVTable(containerId, list); };
+    chk.onchange = () => { kv.disabled = !chk.checked; if (onChange) onChange(); };
+    keyInput.oninput = () => { kv.key = keyInput.value; if (onChange) onChange(); };
+    valInput.oninput = () => { kv.value = valInput.value; if (onChange) onChange(); };
+    row.querySelector('.remove-row').onclick = () => { list.splice(i, 1); renderKVTable(containerId, list, onChange); if (onChange) onChange(); };
     container.appendChild(row);
   });
 }
@@ -604,17 +654,68 @@ async function fetchOAuth2Token(params, grantType) {
 
 function renderBodyFields() {
   const mode = currentRequest.body.mode;
-  $('#bodyRaw').classList.toggle('hidden', mode !== 'raw');
-  $('#bodyLanguage').classList.toggle('hidden', mode !== 'raw');
+  // graphql is sent exactly like raw (see buildBody in execute.go — same
+  // case, same handling), so it reuses the same textarea + language UI
+  // rather than needing its own.
+  const isRawLike = mode === 'raw' || mode === 'graphql';
+  $('#bodyRaw').classList.toggle('hidden', !isRawLike);
+  $('#bodyLanguage').classList.toggle('hidden', !isRawLike);
   $('#bodyUrlEncodedTable').classList.toggle('hidden', mode !== 'urlencoded');
+  $('#addUrlEncodedRow').classList.toggle('hidden', mode !== 'urlencoded');
+  $('#bodyFormDataTable').classList.toggle('hidden', mode !== 'formdata');
+  $('#addFormDataRow').classList.toggle('hidden', mode !== 'formdata');
   if (mode === 'urlencoded') {
     renderKVTable('bodyUrlEncodedTable', currentRequest.body.urlEncoded || (currentRequest.body.urlEncoded = []));
   }
+  if (mode === 'formdata') {
+    renderFormDataTable();
+  }
+}
+
+// Form-data rows need a Type (text/file) selector the generic KV table
+// doesn't have, so this is its own renderer rather than reusing
+// renderKVTable. File uploads aren't wired up yet (see the matching
+// comment in execute.go's buildBody — a file field is sent empty); the
+// Type selector still lets you mark a field as "file" so the request
+// shape round-trips correctly even though content upload isn't there yet.
+function renderFormDataTable() {
+  const container = $('#bodyFormDataTable');
+  const list = currentRequest.body.formData || (currentRequest.body.formData = []);
+  container.innerHTML = '';
+  list.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'kv-row';
+    row.innerHTML = `
+      <input type="checkbox" ${f.disabled ? '' : 'checked'} title="Enabled">
+      <input type="text" placeholder="Key" value="${escapeAttr(f.key)}">
+      <input type="text" placeholder="Value" value="${escapeAttr(f.value)}">
+      <select style="flex:0 0 70px">
+        <option value="text">Text</option>
+        <option value="file">File</option>
+      </select>
+      <button class="remove-row" title="Remove">×</button>`;
+    const [chk, keyInput, valInput] = row.querySelectorAll('input');
+    const typeSel = row.querySelector('select');
+    typeSel.value = f.type === 'file' ? 'file' : 'text';
+    chk.onchange = () => { f.disabled = !chk.checked; };
+    keyInput.oninput = () => { f.key = keyInput.value; };
+    valInput.oninput = () => { f.value = valInput.value; };
+    const applyTypeState = () => {
+      f.type = typeSel.value;
+      valInput.disabled = f.type === 'file';
+      valInput.placeholder = f.type === 'file' ? 'File upload not yet supported — sent empty' : 'Value';
+    };
+    typeSel.onchange = applyTypeState;
+    applyTypeState();
+    row.querySelector('.remove-row').onclick = () => { list.splice(i, 1); renderFormDataTable(); };
+    container.appendChild(row);
+  });
 }
 
 function collectFormIntoRequest() {
   currentRequest.method = $('#methodSelect').value;
-  currentRequest.urlRaw = $('#urlInput').value;
+  // urlRaw is kept live-updated by composeUrlFromFields() on every
+  // Protocol/Domain/Port/Path edit — nothing to re-read here.
   currentRequest.body.mode = $('#bodyMode').value;
   currentRequest.body.rawLanguage = $('#bodyLanguage').value;
   currentRequest.body.raw = $('#bodyRaw').value;
@@ -1183,8 +1284,10 @@ window.addEventListener('unhandledrejection', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;
-  $('#urlInput').oninput = () => { currentRequest.urlRaw = $('#urlInput').value; syncPortFieldFromUrl(); };
-  $('#portInput').oninput = applyPortFieldToUrl;
+  $('#protocolSelect').onchange = composeUrlFromFields;
+  $('#domainInput').oninput = composeUrlFromFields;
+  $('#portInput').oninput = composeUrlFromFields;
+  $('#pathInput').oninput = composeUrlFromFields;
 
   $('#importCollectionBtn').onclick = () => $('#importCollectionInput').click();
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
@@ -1230,9 +1333,19 @@ document.addEventListener('DOMContentLoaded', () => {
   $$('.add-row').forEach(btn => {
     btn.onclick = () => {
       const target = btn.dataset.target;
-      if (target === 'params') { currentRequest.query.push({ key: '', value: '', disabled: false }); renderKVTable('paramsTable', currentRequest.query); }
+      if (target === 'params') { currentRequest.query.push({ key: '', value: '', disabled: false }); renderKVTable('paramsTable', currentRequest.query, refreshFullUrlPreview); }
       if (target === 'headers') { currentRequest.headers.push({ key: '', value: '', disabled: false }); renderKVTable('headersTable', currentRequest.headers); }
       if (target === 'captures') { currentRequest.captures.push({ source: 'header', from: '', intoVar: '' }); renderCapturesTable(); }
+      if (target === 'urlencoded') {
+        const list = currentRequest.body.urlEncoded || (currentRequest.body.urlEncoded = []);
+        list.push({ key: '', value: '', disabled: false });
+        renderKVTable('bodyUrlEncodedTable', list);
+      }
+      if (target === 'formdata') {
+        const list = currentRequest.body.formData || (currentRequest.body.formData = []);
+        list.push({ key: '', value: '', type: 'text', disabled: false });
+        renderFormDataTable();
+      }
     };
   });
   $('#authType').onchange = (e) => { currentRequest.auth.type = e.target.value; renderAuthFields(); };

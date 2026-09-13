@@ -46,11 +46,17 @@
         <option>GET</option><option>POST</option><option>PUT</option>
         <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
       </select>
-      <input id="urlInput" type="text" placeholder="https://api.example.com/path?{{var}}=1">
-      <input id="portInput" type="text" placeholder="port" title="Explicit port — same as putting :port in the URL, kept in sync with it">
+      <select id="protocolSelect" title="Disabled when Domain is a {{variable}} — assumed to already include the scheme">
+        <option value="https">https://</option>
+        <option value="http">http://</option>
+      </select>
+      <input id="domainInput" type="text" placeholder="api.example.com or {{baseUrl}}">
+      <input id="portInput" type="text" placeholder="port">
+      <input id="pathInput" type="text" placeholder="/v1/resource">
       <button id="sendBtn">Send</button>
       <button id="saveRequestBtn" title="Save changes back to the collection">Save</button>
     </div>
+    <div class="full-url-preview" id="fullUrlPreview"></div>
 
     <div class="tabs" id="requestTabs">
       <button class="tab active" data-tab="params">Query Params</button>
@@ -86,6 +92,8 @@
         <option value="none">None</option>
         <option value="raw">Raw</option>
         <option value="urlencoded">x-www-form-urlencoded</option>
+        <option value="formdata">Form Data</option>
+        <option value="graphql">GraphQL</option>
       </select>
       <select id="bodyLanguage">
         <option value="json">JSON</option>
@@ -94,6 +102,9 @@
       </select>
       <textarea id="bodyRaw" placeholder="Request body" rows="12"></textarea>
       <div id="bodyUrlEncodedTable" class="kv-table hidden"></div>
+      <button class="add-row hidden" id="addUrlEncodedRow" data-target="urlencoded">+ Add field</button>
+      <div id="bodyFormDataTable" class="kv-table hidden"></div>
+      <button class="add-row hidden" id="addFormDataRow" data-target="formdata">+ Add field</button>
     </div>
     <div class="tab-panel hidden" id="panel-script">
       <p class="hint">Imported Postman scripts are shown for reference only — pmclone does not execute JavaScript.

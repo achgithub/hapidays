@@ -166,6 +166,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	}
 
 	rawURL := Resolve(spec.URLRaw, vars)
+	rawURL = applyQueryParams(rawURL, spec.Query, vars)
 
 	bodyBytes, contentType, err := buildBody(spec.Body, vars)
 	if err != nil {
@@ -245,6 +246,31 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 // bytes plus the Content-Type it implies. Returning bytes (not a reader)
 // lets Execute reuse the same body across the digest-auth retry and lets
 // AWS SigV4 hash the payload without consuming a stream.
+// applyQueryParams merges spec.Query into rawURL's query string. Uses
+// url.Values.Set (last-write-wins per key), not Add, deliberately: Postman
+// exports duplicate query params both inline in url.raw AND in a separate
+// url.query array (the importer used to just keep both, harmlessly, back
+// when this array was never actually applied to the outgoing request) —
+// Set collapses that duplication down to one value per key instead of
+// sending every param twice for anything imported before this existed.
+func applyQueryParams(rawURL string, query []model.KV, vars map[string]string) string {
+	var enabled []model.KV
+	for _, kv := range query {
+		if !kv.Disabled {
+			enabled = append(enabled, kv)
+		}
+	}
+	if len(enabled) == 0 {
+		return rawURL
+	}
+	base, existingQuery, _ := strings.Cut(rawURL, "?")
+	q, _ := url.ParseQuery(existingQuery) // malformed existing query just starts empty, not fatal
+	for _, kv := range enabled {
+		q.Set(Resolve(kv.Key, vars), Resolve(kv.Value, vars))
+	}
+	return base + "?" + q.Encode()
+}
+
 func buildBody(body model.Body, vars map[string]string) ([]byte, string, error) {
 	switch body.Mode {
 	case model.BodyRaw, model.BodyGraphQL:

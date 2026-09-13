@@ -253,9 +253,15 @@ func convertItems(items []rawItem, newID func() string) []*model.Node {
 }
 
 func convertRequest(r rawRequest, events []rawEvent) *model.RequestSpec {
+	// Postman's own export duplicates query params: once inline in
+	// url.raw, again in url.query. Keep only the latter — URLRaw here is
+	// the base URL with no query string, matching how the app treats
+	// Query as the sole source of query params (applyQueryParams merges
+	// it in at send time).
+	urlRaw, _, _ := strings.Cut(r.URL.Raw, "?")
 	spec := &model.RequestSpec{
 		Method: r.Method,
-		URLRaw: r.URL.Raw,
+		URLRaw: urlRaw,
 	}
 	for _, q := range r.URL.Query {
 		spec.Query = append(spec.Query, model.KV{Key: q.Key, Value: q.Value, Disabled: q.Disabled})

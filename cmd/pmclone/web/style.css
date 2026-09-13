@@ -106,10 +106,16 @@ button, input, select, textarea { font-family: inherit; font-size: 13px; }
 .sidebar-footer { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
 
 .main { flex: 1; display: flex; flex-direction: column; padding: 12px; overflow-y: auto; }
-.request-bar { display: flex; gap: 6px; margin-bottom: 10px; }
-#urlInput { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: ui-monospace, monospace; }
+.request-bar { display: flex; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+#domainInput, #pathInput { flex: 1 1 160px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: ui-monospace, monospace; }
 #portInput { width: 64px; flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: ui-monospace, monospace; }
+#protocolSelect { flex: 0 0 auto; }
+#protocolSelect:disabled { opacity: 0.5; }
 #methodSelect { font-weight: 700; }
+.full-url-preview {
+  font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-dim);
+  margin-bottom: 10px; word-break: break-all; padding: 0 2px;
+}
 
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
 .tab { background: none; border: none; padding: 6px 12px; cursor: pointer; color: var(--text-dim); border-bottom: 2px solid transparent; }
