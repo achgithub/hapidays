@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"pmclone/internal/model"
+	"hapidays/internal/model"
 )
 
 // cookieMu guards cookies.json separately from Store.mu so a cookie write

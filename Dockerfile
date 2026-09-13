@@ -1,4 +1,4 @@
-# Build-only image: compiles pmclone for every target OS/arch and leaves
+# Build-only image: compiles hapidays for every target OS/arch and leaves
 # the binaries in /out. Nothing here runs at container runtime — this is
 # purely a cross-compiler since there's no local Go toolchain.
 FROM golang:1.22-bookworm AS build
@@ -10,9 +10,9 @@ ENV CGO_ENABLED=0
 RUN set -eux; \
   for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do \
     GOOS=${target%/*}; GOARCH=${target#*/}; \
-    out=/out/pmclone-${GOOS}-${GOARCH}; \
+    out=/out/hapidays-${GOOS}-${GOARCH}; \
     [ "$GOOS" = "windows" ] && out="${out}.exe"; \
-    GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -o "$out" ./cmd/pmclone; \
+    GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -o "$out" ./cmd/hapidays; \
   done
 
 FROM scratch AS export

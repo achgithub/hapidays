@@ -1,6 +1,6 @@
-// Package api wires pmclone's HTTP endpoints: CRUD over collections and
+// Package api wires hapidays's HTTP endpoints: CRUD over collections and
 // environments, Postman import, request execution, history and settings.
-// The server is meant to be bound to 127.0.0.1 only (see cmd/pmclone) —
+// The server is meant to be bound to 127.0.0.1 only (see cmd/hapidays) —
 // this package still checks Origin on state-changing/execute requests as
 // defense in depth, since any page open in the same browser could
 // otherwise drive it and read saved secrets.
@@ -16,12 +16,12 @@ import (
 	"strings"
 	"time"
 
-	"pmclone/internal/client"
-	"pmclone/internal/model"
-	"pmclone/internal/oauth2"
-	"pmclone/internal/postman"
-	"pmclone/internal/runner"
-	"pmclone/internal/store"
+	"hapidays/internal/client"
+	"hapidays/internal/model"
+	"hapidays/internal/oauth2"
+	"hapidays/internal/postman"
+	"hapidays/internal/runner"
+	"hapidays/internal/store"
 )
 
 type Server struct {

@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"pmclone/internal/model"
-	"pmclone/internal/store"
+	"hapidays/internal/model"
+	"hapidays/internal/store"
 )
 
 type Result struct {

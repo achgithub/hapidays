@@ -1,6 +1,6 @@
 // Package runner executes every request in a collection (or one folder of
 // it) in tree order, optionally once per row of an iteration data set —
-// pmclone's answer to Postman's Collection Runner, which as of 2026 is
+// hapidays's answer to Postman's Collection Runner, which as of 2026 is
 // rate-limited/paywalled on the free tier. This one has no tier.
 package runner
 
@@ -8,8 +8,8 @@ import (
 	"context"
 	"time"
 
-	"pmclone/internal/client"
-	"pmclone/internal/model"
+	"hapidays/internal/client"
+	"hapidays/internal/model"
 )
 
 type Options struct {

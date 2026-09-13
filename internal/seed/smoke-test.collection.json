@@ -1,5 +1,5 @@
 {
-  "name": "pmclone smoke test",
+  "name": "hapidays smoke test",
   "variables": [
     { "key": "baseHttpbin", "value": "https://httpbin.org" },
     { "key": "baseJsonPlaceholder", "value": "https://jsonplaceholder.typicode.com" },
@@ -7,7 +7,7 @@
   ],
   "auth": {
     "type": "basic",
-    "params": { "username": "pmclone", "password": "test123" }
+    "params": { "username": "hapidays", "password": "test123" }
   },
   "root": [
     {
@@ -19,8 +19,8 @@
           "name": "Basic Auth (explicit)",
           "request": {
             "method": "GET",
-            "urlRaw": "{{baseHttpbin}}/basic-auth/pmclone/test123",
-            "auth": { "type": "basic", "params": { "username": "pmclone", "password": "test123" } },
+            "urlRaw": "{{baseHttpbin}}/basic-auth/hapidays/test123",
+            "auth": { "type": "basic", "params": { "username": "hapidays", "password": "test123" } },
             "body": { "mode": "none" }
           }
         },
@@ -29,8 +29,8 @@
           "name": "Digest Auth",
           "request": {
             "method": "GET",
-            "urlRaw": "{{baseHttpbin}}/digest-auth/auth/pmclone/test123",
-            "auth": { "type": "digest", "params": { "username": "pmclone", "password": "test123" } },
+            "urlRaw": "{{baseHttpbin}}/digest-auth/auth/hapidays/test123",
+            "auth": { "type": "digest", "params": { "username": "hapidays", "password": "test123" } },
             "body": { "mode": "none" }
           }
         },
@@ -106,7 +106,7 @@
           "name": "Inherit From Collection (uses collection's Basic auth)",
           "request": {
             "method": "GET",
-            "urlRaw": "{{baseHttpbin}}/basic-auth/pmclone/test123",
+            "urlRaw": "{{baseHttpbin}}/basic-auth/hapidays/test123",
             "auth": { "type": "inherit" },
             "body": { "mode": "none" }
           }
@@ -116,7 +116,7 @@
           "name": "Explicit No Auth (should 401 — proves it does NOT fall back to collection auth)",
           "request": {
             "method": "GET",
-            "urlRaw": "{{baseHttpbin}}/basic-auth/pmclone/test123",
+            "urlRaw": "{{baseHttpbin}}/basic-auth/hapidays/test123",
             "auth": { "type": "none" },
             "body": { "mode": "none" }
           }
@@ -144,7 +144,7 @@
             "method": "POST",
             "urlRaw": "{{baseHttpbin}}/post",
             "auth": { "type": "inherit" },
-            "body": { "mode": "raw", "raw": "<note><to>pmclone</to><body>smoke test</body></note>", "rawLanguage": "xml" }
+            "body": { "mode": "raw", "raw": "<note><to>hapidays</to><body>smoke test</body></note>", "rawLanguage": "xml" }
           }
         },
         {
@@ -204,8 +204,8 @@
       "id": "folder-cookies",
       "name": "4. Cookies (run these two in order)",
       "children": [
-        { "id": "cookies-set", "name": "1) Set a cookie", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/cookies/set?smoke=pmclone123", "auth": { "type": "none" }, "body": { "mode": "none" } } },
-        { "id": "cookies-read", "name": "2) Read cookies back (should show smoke=pmclone123)", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/cookies", "auth": { "type": "none" }, "body": { "mode": "none" } } }
+        { "id": "cookies-set", "name": "1) Set a cookie", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/cookies/set?smoke=hapidays123", "auth": { "type": "none" }, "body": { "mode": "none" } } },
+        { "id": "cookies-read", "name": "2) Read cookies back (should show smoke=hapidays123)", "request": { "method": "GET", "urlRaw": "{{baseHttpbin}}/cookies", "auth": { "type": "none" }, "body": { "mode": "none" } } }
       ]
     },
     {

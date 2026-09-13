@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"pmclone/internal/model"
+	"hapidays/internal/model"
 )
 
 type Settings struct {
@@ -102,7 +102,7 @@ func (s *Store) ListCollections() ([]*model.Collection, error) {
 // not resurrect it on the next launch.
 const smokeTestSeedMarker = ".smoke-test-seeded"
 
-// SeedSmokeTestCollection writes the bundled "pmclone smoke test"
+// SeedSmokeTestCollection writes the bundled "hapidays smoke test"
 // collection (see internal/seed) into a data directory exactly once —
 // so a fresh install has something to test the app against without a
 // manual import — and is a no-op on every run after that.

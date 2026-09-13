@@ -2,7 +2,7 @@
 // testing an API: client_credentials, password, and authorization_code.
 // The authorization_code flow runs its own localhost callback listener —
 // deliberately never Postman's hosted https://oauth.pstmn.io redirect —
-// so pmclone has zero dependency on any third party to complete it.
+// so hapidays has zero dependency on any third party to complete it.
 //
 // authorization_code is inherently two-phase: the caller needs the
 // authorization URL back immediately (to open a browser tab) before
@@ -163,7 +163,7 @@ func (m *Manager) Start(p Params) (sessionID, authURL string, err error) {
 		}
 		w.Header().Set("Content-Type", "text/html")
 		_, _ = w.Write([]byte(`<html><body style="font-family:sans-serif;padding:2rem">
-			Authorization received — you can close this tab and return to pmclone.</body></html>`))
+			Authorization received — you can close this tab and return to hapidays.</body></html>`))
 
 		result, exErr := exchangeForm(r.Context(), p.AccessTokenURL, url.Values{
 			"grant_type":    {"authorization_code"},

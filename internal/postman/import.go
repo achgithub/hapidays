@@ -1,5 +1,5 @@
 // Package postman imports Postman Collection v2.0/v2.1 exports and
-// Postman environment exports into pmclone's normalized internal/model
+// Postman environment exports into hapidays's normalized internal/model
 // types.
 //
 // Postman's JSON is polymorphic in several places (see the raw* types
@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strings"
 
-	"pmclone/internal/model"
+	"hapidays/internal/model"
 )
 
 // ---- raw (on-disk) shapes ----

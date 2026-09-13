@@ -1,4 +1,4 @@
-// pmclone frontend. Vanilla JS, no framework/CDN — this has to keep
+// hapidays frontend. Vanilla JS, no framework/CDN — this has to keep
 // working on networks that block everything but this one binary.
 'use strict';
 
