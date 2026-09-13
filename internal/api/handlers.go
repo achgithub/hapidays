@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"hapidays/internal/client"
+	"hapidays/internal/importer"
 	"hapidays/internal/model"
 	"hapidays/internal/oauth2"
-	"hapidays/internal/postman"
 	"hapidays/internal/runner"
 	"hapidays/internal/store"
 	"hapidays/internal/wsdl"
@@ -138,7 +138,7 @@ func (s *Server) importCollection(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	col, err := postman.ImportCollection(data, store.NewID)
+	col, err := importer.ImportCollection(data, store.NewID)
 	if err != nil {
 		writeErr(w, 400, err)
 		return
@@ -279,7 +279,7 @@ func (s *Server) importEnvironment(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	env, err := postman.ImportEnvironment(data, store.NewID)
+	env, err := importer.ImportEnvironment(data, store.NewID)
 	if err != nil {
 		writeErr(w, 400, err)
 		return

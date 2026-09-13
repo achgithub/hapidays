@@ -1,5 +1,5 @@
 // Package model holds the app's normalized data model. Postman's on-disk
-// format is polymorphic (see internal/postman); everything downstream of the
+// format is polymorphic (see internal/importer); everything downstream of the
 // importer works against these plain, order-preserving types instead.
 package model
 
@@ -91,7 +91,7 @@ type RequestSpec struct {
 	Captures []Capture `json:"captures,omitempty"`
 
 	// Raw scripts imported from Postman, kept for visibility but not
-	// executed (see internal/postman doc comment for why).
+	// executed (see internal/importer doc comment for why).
 	PreRequestScript string `json:"preRequestScript,omitempty"`
 	TestScript       string `json:"testScript,omitempty"`
 	HasScript        bool   `json:"hasScript,omitempty"`

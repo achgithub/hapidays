@@ -1,4 +1,4 @@
-// Package postman imports Postman Collection v2.0/v2.1 exports and
+// Package importer imports Postman Collection v2.0/v2.1 exports and
 // Postman environment exports into hapidays's normalized internal/model
 // types.
 //
@@ -10,7 +10,7 @@
 // matters in practice, SAP/OData's "X-CSRF-Token: Fetch" + capture, is
 // instead covered by model.Capture, which the UI can set up per-request
 // without running arbitrary JS.
-package postman
+package importer
 
 import (
 	"encoding/json"

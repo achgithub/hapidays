@@ -157,7 +157,7 @@ func buildHTTPClient(opts Options) (*http.Client, error) {
 // Execute resolves variables into spec, sends the request, and applies any
 // Capture rules against the response. It never runs Postman pre-
 // request/test scripts (spec.PreRequestScript / TestScript) — those are
-// display-only; see internal/postman for why.
+// display-only; see internal/importer for why.
 //
 // Digest auth (RFC 7616) needs two round trips — an initial request to
 // receive the WWW-Authenticate challenge, then the real, signed one — so
