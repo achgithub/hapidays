@@ -842,15 +842,22 @@ async function loadEnvironments() {
 function openEnvEditor() {
   const env = state.environments.find(e => e.id === state.currentEnvironmentId);
   const values = env ? JSON.parse(JSON.stringify(env.values)) : [];
-  const name = env ? env.name : 'New Environment';
+  // editingId tracks which environment Save overwrites — null means Save
+  // creates a new one instead. Starts as env's id (editing in place);
+  // clicking Duplicate below clears it so Save creates a fresh copy
+  // rather than overwriting the one you duplicated from. This is how you
+  // build a Test environment out of Dev without retyping every variable:
+  // open Dev, Duplicate, rename, tweak the couple of values that differ.
+  let editingId = env ? env.id : null;
 
   showModal(`
     <h3>Environment</h3>
-    <div class="field-row"><label>Name</label><input type="text" id="envNameInput" value="${escapeAttr(name)}"></div>
+    <div class="field-row"><label>Name</label><input type="text" id="envNameInput" value="${escapeAttr(env ? env.name : 'New Environment')}"></div>
     <div id="envValuesTable" class="kv-table"></div>
     <button class="add-row" id="envAddRow">+ Add variable</button>
     <div class="modal-actions">
       <button id="envCancel">Cancel</button>
+      ${env ? '<button id="envDuplicate" title="Start a new environment pre-filled with these variables">Duplicate</button>' : ''}
       <button id="envSave" style="background:var(--accent);color:#fff">Save</button>
     </div>
   `);
@@ -859,10 +866,17 @@ function openEnvEditor() {
   renderEnvTable();
   $('#envAddRow').onclick = () => { values.push({ key: '', value: '', disabled: false }); renderEnvTable(); };
   $('#envCancel').onclick = closeModal;
+  if (env) {
+    $('#envDuplicate').onclick = () => {
+      editingId = null;
+      $('#envNameInput').value = env.name + ' copy';
+      $('#envDuplicate').remove();
+    };
+  }
   $('#envSave').onclick = async () => {
-    const payload = { id: env ? env.id : '', name: $('#envNameInput').value, values };
-    const saved = env
-      ? await api(`/environments/${env.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+    const payload = { id: editingId || '', name: $('#envNameInput').value, values };
+    const saved = editingId
+      ? await api(`/environments/${editingId}`, { method: 'PUT', body: JSON.stringify(payload) })
       : await api(`/environments/${crypto.randomUUID()}`, { method: 'PUT', body: JSON.stringify(payload) });
     await loadEnvironments();
     $('#envSelect').value = saved.id;
