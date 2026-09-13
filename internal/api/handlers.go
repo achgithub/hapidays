@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"hapidays/internal/client"
+	"hapidays/internal/curlconv"
 	"hapidays/internal/importer"
 	"hapidays/internal/model"
 	"hapidays/internal/oauth2"
@@ -58,6 +59,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/environments/{id}", s.originGuard(s.deleteEnvironment))
 
 	s.mux.HandleFunc("POST /api/send", s.originGuard(s.send))
+	s.mux.HandleFunc("POST /api/curl/import", s.originGuard(s.curlImport))
+	s.mux.HandleFunc("POST /api/curl/export", s.originGuard(s.curlExport))
 	s.mux.HandleFunc("GET /api/history", s.originGuard(s.listHistory))
 
 	s.mux.HandleFunc("GET /api/settings", s.originGuard(s.getSettings))
@@ -430,6 +433,23 @@ func (s *Server) resolveVars(collectionID, environmentID string) map[string]stri
 	return vars
 }
 
+// settingsForEnvironment overrides the global mTLS client cert with the
+// environment's own, when it has one — dev/test/prod commonly need
+// different client identities. An environment with no cert configured
+// leaves settings untouched (falls back to the global one), not "no cert".
+func (s *Server) settingsForEnvironment(settings store.Settings, environmentID string) store.Settings {
+	if environmentID == "" {
+		return settings
+	}
+	env, err := s.store.LoadEnvironment(environmentID)
+	if err != nil || env.ClientCertFile == "" || env.ClientKeyFile == "" {
+		return settings
+	}
+	settings.ClientCertFile = env.ClientCertFile
+	settings.ClientKeyFile = env.ClientKeyFile
+	return settings
+}
+
 // collectionAuth loads a collection's auth for AuthInherit resolution.
 // Returns the zero Auth (type "") if collectionID is empty or the
 // collection can't be loaded, which applyAuth treats as a no-op — the
@@ -457,6 +477,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	settings = s.settingsForEnvironment(settings, req.EnvironmentID)
 
 	vars := s.resolveVars(req.CollectionID, req.EnvironmentID)
 	for k, v := range req.ExtraVars {
@@ -510,6 +531,37 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, 200, result)
+}
+
+func (s *Server) curlImport(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Curl string `json:"curl"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	spec, err := curlconv.Parse(req.Curl)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	writeJSON(w, 200, spec)
+}
+
+func (s *Server) curlExport(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Request       model.RequestSpec `json:"request"`
+		CollectionID  string            `json:"collectionId"`
+		EnvironmentID string            `json:"environmentId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	vars := s.resolveVars(req.CollectionID, req.EnvironmentID)
+	curl := curlconv.Export(req.Request, vars, s.collectionAuth(req.CollectionID))
+	writeJSON(w, 200, map[string]string{"curl": curl})
 }
 
 func (s *Server) listHistory(w http.ResponseWriter, r *http.Request) {
@@ -624,6 +676,7 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	settings = s.settingsForEnvironment(settings, req.EnvironmentID)
 	vars := s.resolveVars(req.CollectionID, req.EnvironmentID)
 
 	// No fixed request-count cap here (a run is a bounded loop over the

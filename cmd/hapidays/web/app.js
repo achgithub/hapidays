@@ -915,6 +915,10 @@ function openEnvEditor() {
     <div class="field-row"><label>Name</label><input type="text" id="envNameInput" value="${escapeAttr(env ? env.name : 'New Environment')}"></div>
     <div id="envValuesTable" class="kv-table"></div>
     <button class="add-row" id="envAddRow">+ Add variable</button>
+    <div class="field-row"><label>Client cert (mTLS override)</label><input type="text" id="envClientCert" placeholder="leave blank to use the global Settings cert" value="${escapeAttr(env ? env.clientCertFile || '' : '')}"></div>
+    <div class="field-row"><label>Client key (mTLS override)</label><input type="text" id="envClientKey" placeholder="leave blank to use the global Settings cert" value="${escapeAttr(env ? env.clientKeyFile || '' : '')}"></div>
+    <p class="hint">Only needed if this environment (e.g. prod) uses a different client certificate than the one configured
+    in Settings. Leave both blank to fall back to the global cert.</p>
     <div class="modal-actions">
       <button id="envCancel">Cancel</button>
       ${env ? '<button id="envDuplicate" title="Start a new environment pre-filled with these variables">Duplicate</button>' : ''}
@@ -934,7 +938,11 @@ function openEnvEditor() {
     };
   }
   $('#envSave').onclick = async () => {
-    const payload = { id: editingId || '', name: $('#envNameInput').value, values };
+    const payload = {
+      id: editingId || '', name: $('#envNameInput').value, values,
+      clientCertFile: $('#envClientCert').value,
+      clientKeyFile: $('#envClientKey').value,
+    };
     const saved = editingId
       ? await api(`/environments/${editingId}`, { method: 'PUT', body: JSON.stringify(payload) })
       : await api(`/environments/${crypto.randomUUID()}`, { method: 'PUT', body: JSON.stringify(payload) });
@@ -1353,6 +1361,76 @@ async function importFile(input, endpoint, onDone) {
   input.value = '';
 }
 
+// ---------- cURL import/export ----------
+
+function openCurlImportModal() {
+  if (!state.currentCollection) {
+    alert('Select or create a collection first — the imported request needs somewhere to go.');
+    return;
+  }
+  showModal(`
+    <h3>Import from cURL</h3>
+    <p class="hint">Paste a curl command (e.g. "Copy as cURL" from browser devtools). Creates a new request
+    in "${escapeAttr(state.currentCollection.name)}".</p>
+    <textarea id="curlImportInput" rows="10" placeholder="curl 'https://api.example.com/...' -H 'Authorization: Bearer ...'" style="width:100%;font-family:ui-monospace,monospace"></textarea>
+    <div class="modal-actions">
+      <button id="curlImportCancel">Cancel</button>
+      <button id="curlImportGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  $('#curlImportCancel').onclick = closeModal;
+  $('#curlImportGo').onclick = async () => {
+    const curl = $('#curlImportInput').value.trim();
+    if (!curl) return;
+    try {
+      const spec = await api('/curl/import', { method: 'POST', body: JSON.stringify({ curl }) });
+      const name = prompt('Request name:', spec.method + ' ' + (spec.urlRaw || 'request')) || 'Imported request';
+      const newIndex = state.currentCollection.root.length;
+      state.currentCollection.root.push({ id: crypto.randomUUID(), name, request: spec });
+      await persistCollectionTree();
+      selectRequest([newIndex]);
+      closeModal();
+    } catch (e) {
+      alert('Could not parse that as a curl command: ' + e.message);
+    }
+  };
+}
+
+async function openCurlExportModal() {
+  collectFormIntoRequest();
+  let curl;
+  try {
+    curl = (await api('/curl/export', {
+      method: 'POST',
+      body: JSON.stringify({
+        request: currentRequest,
+        collectionId: state.currentCollection ? state.currentCollection.id : '',
+        environmentId: state.currentEnvironmentId || '',
+      }),
+    })).curl;
+  } catch (e) {
+    alert('Could not generate curl: ' + e.message);
+    return;
+  }
+  showModal(`
+    <h3>Copy as cURL</h3>
+    <textarea id="curlExportOutput" rows="12" readonly style="width:100%;font-family:ui-monospace,monospace">${escapeAttr(curl)}</textarea>
+    <div class="modal-actions">
+      <button id="curlExportClose">Close</button>
+      <button id="curlExportCopy" style="background:var(--accent);color:#fff">Copy to clipboard</button>
+    </div>
+  `);
+  $('#curlExportClose').onclick = closeModal;
+  $('#curlExportCopy').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(curl);
+      $('#curlExportCopy').textContent = 'Copied!';
+    } catch (_) {
+      $('#curlExportOutput').select(); // clipboard API unavailable — select the text so Ctrl/Cmd+C still works
+    }
+  };
+}
+
 // ---------- WSDL import ----------
 
 function openWsdlImportModal() {
@@ -1518,6 +1596,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
   $('#importWsdlBtn').onclick = openWsdlImportModal;
   $('#importODataBtn').onclick = openODataImportModal;
+  $('#importCurlBtn').onclick = openCurlImportModal;
+  $('#copyAsCurlBtn').onclick = openCurlExportModal;
 
   $('#importEnvBtn').onclick = () => $('#importEnvInput').click();
   $('#importEnvInput').onchange = (e) => importFile(e.target, '/environments/import', loadEnvironments);

@@ -129,10 +129,17 @@ type Collection struct {
 }
 
 type Environment struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Values    []KV      `json:"values"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Values []KV   `json:"values"`
+	// ClientCertFile/ClientKeyFile, when set, override the global mTLS
+	// cert configured in Settings for requests sent under this
+	// environment — different environments (dev/test/prod) commonly need
+	// different client identities. Empty means "use the global Settings
+	// cert", not "use no cert".
+	ClientCertFile string    `json:"clientCertFile,omitempty"`
+	ClientKeyFile  string    `json:"clientKeyFile,omitempty"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 type HistoryEntry struct {
