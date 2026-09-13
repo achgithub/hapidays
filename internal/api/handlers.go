@@ -338,13 +338,16 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = s.store.AppendHistory(model.HistoryEntry{
-		ID:         store.NewID(),
-		Timestamp:  time.Now(),
-		Method:     req.Request.Method,
-		URL:        client.Resolve(req.Request.URLRaw, vars),
-		Status:     result.Status,
-		DurationMS: result.DurationMS,
-		SizeBytes:  result.SizeBytes,
+		ID:            store.NewID(),
+		Timestamp:     time.Now(),
+		Method:        req.Request.Method,
+		URL:           client.Resolve(req.Request.URLRaw, vars),
+		Status:        result.Status,
+		DurationMS:    result.DurationMS,
+		SizeBytes:     result.SizeBytes,
+		Request:       req.Request,
+		CollectionID:  req.CollectionID,
+		EnvironmentID: req.EnvironmentID,
 	})
 
 	writeJSON(w, 200, result)

@@ -718,9 +718,33 @@ async function loadHistory() {
     div.className = 'history-item';
     const statusLabel = h.status ? h.status : 'ERR';
     div.textContent = `${h.method} ${statusLabel} · ${h.url}`;
-    div.title = new Date(h.timestamp).toLocaleString();
+    div.title = new Date(h.timestamp).toLocaleString() + ' — click to reload into the editor';
+    div.onclick = () => loadHistoryEntry(h);
     container.appendChild(div);
   });
+}
+
+// Pops a history entry back into the request editor so it can be
+// inspected or re-sent. Best-effort restores the collection/environment
+// it originally ran under too (they may since have been deleted/renamed),
+// since that's what "inherit" auth and {{vars}} resolve against — without
+// it, replaying a history entry for a request that used inherited auth
+// would silently send with no auth, the exact bug this app used to have.
+async function loadHistoryEntry(entry) {
+  if (entry.collectionId && (!state.currentCollection || state.currentCollection.id !== entry.collectionId)) {
+    try {
+      state.currentCollection = await api(`/collections/${entry.collectionId}`);
+    } catch (e) {
+      state.currentCollection = null; // collection no longer exists — reload the request anyway
+    }
+  }
+  if (entry.environmentId && state.environments.some(e => e.id === entry.environmentId)) {
+    state.currentEnvironmentId = entry.environmentId;
+    $('#envSelect').value = entry.environmentId;
+  }
+  state.selectedPath = null; // not tied to a saved tree node — Send works, Save needs a node picked first
+  renderCollectionList();
+  loadRequestIntoForm(entry.request);
 }
 
 // ---------- collection runner ----------

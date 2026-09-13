@@ -122,10 +122,19 @@ type HistoryEntry struct {
 	ID         string    `json:"id"`
 	Timestamp  time.Time `json:"timestamp"`
 	Method     string    `json:"method"`
-	URL        string    `json:"url"`
+	URL        string    `json:"url"` // resolved (vars substituted), for display only
 	Status     int       `json:"status"`
 	DurationMS int64     `json:"durationMs"`
 	SizeBytes  int64     `json:"sizeBytes"`
+
+	// Request is the original, unresolved spec (as composed, {{vars}}
+	// intact) — kept so a history entry can be reloaded into the editor
+	// and re-sent, not just looked at. CollectionID/EnvironmentID (best
+	// effort: the collection/environment may since have been deleted) let
+	// the reload restore the same var/inherit-auth context it ran under.
+	Request       RequestSpec `json:"request"`
+	CollectionID  string      `json:"collectionId,omitempty"`
+	EnvironmentID string      `json:"environmentId,omitempty"`
 }
 
 // CookieRecord is one persisted cookie, matched against outgoing requests
