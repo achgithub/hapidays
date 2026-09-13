@@ -1351,6 +1351,38 @@ async function importFile(input, endpoint, onDone) {
   input.value = '';
 }
 
+// ---------- WSDL import ----------
+
+function openWsdlImportModal() {
+  showModal(`
+    <h3>Import WSDL</h3>
+    <p class="hint">Generates one request per SOAP operation, with the endpoint, SOAPAction, and
+    envelope skeleton already filled in.</p>
+    <div class="field-row"><label>WSDL URL</label><input type="text" id="wsdlUrlInput" placeholder="http://host/service.asmx?WSDL"></div>
+    <p class="hint">...or upload a .wsdl/.xml file instead:</p>
+    <input type="file" id="wsdlFileInput" accept=".wsdl,.xml">
+    <div class="modal-actions">
+      <button id="wsdlImportCancel">Cancel</button>
+      <button id="wsdlImportGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  $('#wsdlImportCancel').onclick = closeModal;
+  $('#wsdlImportGo').onclick = async () => {
+    const url = $('#wsdlUrlInput').value.trim();
+    const file = $('#wsdlFileInput').files[0];
+    if (!url && !file) { alert('Provide a WSDL URL or choose a file to upload.'); return; }
+    const payload = { url };
+    if (file) payload.raw = await file.text();
+    try {
+      await api('/wsdl/import', { method: 'POST', body: JSON.stringify(payload) });
+      await loadCollections();
+      closeModal();
+    } catch (e) {
+      alert('WSDL import failed: ' + e.message);
+    }
+  };
+}
+
 // ---------- XML pretty-printing ----------
 
 // detectSoapFault finds a SOAP Fault regardless of HTTP status — a fault is
@@ -1442,6 +1474,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('#importCollectionBtn').onclick = () => $('#importCollectionInput').click();
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
+  $('#importWsdlBtn').onclick = openWsdlImportModal;
 
   $('#importEnvBtn').onclick = () => $('#importEnvInput').click();
   $('#importEnvInput').onchange = (e) => importFile(e.target, '/environments/import', loadEnvironments);

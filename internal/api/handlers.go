@@ -22,6 +22,7 @@ import (
 	"hapidays/internal/postman"
 	"hapidays/internal/runner"
 	"hapidays/internal/store"
+	"hapidays/internal/wsdl"
 )
 
 type Server struct {
@@ -43,6 +44,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/collections", s.originGuard(s.listCollections))
 	s.mux.HandleFunc("POST /api/collections/import", s.originGuard(s.importCollection))
+	s.mux.HandleFunc("POST /api/wsdl/import", s.originGuard(s.importWSDL))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
 	s.mux.HandleFunc("PUT /api/collections/{id}", s.originGuard(s.saveCollection))
 	s.mux.HandleFunc("DELETE /api/collections/{id}", s.originGuard(s.deleteCollection))
@@ -147,6 +149,85 @@ func (s *Server) importCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, col)
+}
+
+// importWSDL accepts either { "raw": "<wsdl xml>" } (uploaded file content,
+// read client-side and posted as text) or { "url": "https://..." } (fetched
+// here — a browser can't cross-origin-fetch a ?WSDL URL, so this has to be
+// server-side, same exposure class as /api/send which already lets a user
+// point this tool at any URL by design).
+func (s *Server) importWSDL(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Raw string `json:"raw"`
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+
+	data := []byte(req.Raw)
+	if req.URL != "" {
+		fetched, err := fetchWSDL(r.Context(), req.URL)
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		data = fetched
+	}
+	if len(data) == 0 {
+		writeErr(w, 400, fmt.Errorf("no WSDL content provided (neither raw text nor a fetchable url)"))
+		return
+	}
+
+	col, err := wsdl.Import(data, req.URL, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	col.UpdatedAt = time.Now()
+	if err := s.store.SaveCollection(col); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, col)
+}
+
+func fetchWSDL(ctx context.Context, rawURL string) ([]byte, error) {
+	httpClient := &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("stopped after 5 redirects")
+			}
+			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+				return fmt.Errorf("refusing redirect to non-http(s) scheme %q", req.URL.Scheme)
+			}
+			return nil
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+		return nil, fmt.Errorf("only http/https URLs are supported")
+	}
+	// Some WSDL hosts (IIS/legacy ASP.NET services, and the WAFs in front
+	// of them) reset the connection on Go's default "Go-http-client/1.1"
+	// User-Agent — hit this exact wall testing against dneonline's own
+	// calculator WSDL. A browser-shaped UA avoids it and is otherwise
+	// harmless.
+	req.Header.Set("User-Agent", "Mozilla/5.0 hapidays-wsdl-import")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch WSDL: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("fetching WSDL: server returned HTTP %d", resp.StatusCode)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 }
 
 func (s *Server) getCollection(w http.ResponseWriter, r *http.Request) {
