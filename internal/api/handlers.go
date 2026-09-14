@@ -56,6 +56,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/odata/import", s.originGuard(s.importOData))
 	s.mux.HandleFunc("POST /api/graphql/import", s.originGuard(s.importGraphQL))
 	s.mux.HandleFunc("POST /api/grpc/import", s.originGuard(s.importGRPC))
+	s.mux.HandleFunc("GET /api/collections/{id}/export/postman", s.originGuard(s.exportCollectionPostman))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
 	s.mux.HandleFunc("PUT /api/collections/{id}", s.originGuard(s.saveCollection))
 	s.mux.HandleFunc("DELETE /api/collections/{id}", s.originGuard(s.deleteCollection))
@@ -480,6 +481,26 @@ func (s *Server) getCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, col)
+}
+
+// exportCollectionPostman is the one-way counterpart to importCollection's
+// Postman-recognizing path — renders col in Postman Collection Format v2.1
+// (see internal/importer/export.go) instead of hapidays's own native
+// export shape, so it can be opened directly in Postman.
+func (s *Server) exportCollectionPostman(w http.ResponseWriter, r *http.Request) {
+	col, err := s.store.LoadCollection(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 404, err)
+		return
+	}
+	data, err := importer.ExportCollection(col)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, _ = w.Write(data)
 }
 
 func (s *Server) saveCollection(w http.ResponseWriter, r *http.Request) {
@@ -1097,6 +1118,7 @@ type oauth2TokenRequest struct {
 	Username       string `json:"username,omitempty"`
 	Password       string `json:"password,omitempty"`
 	Scope          string `json:"scope,omitempty"`
+	RefreshToken   string `json:"refreshToken,omitempty"`
 }
 
 func (s *Server) oauth2Token(w http.ResponseWriter, r *http.Request) {
@@ -1113,6 +1135,7 @@ func (s *Server) oauth2Token(w http.ResponseWriter, r *http.Request) {
 		Username:       req.Username,
 		Password:       req.Password,
 		Scope:          req.Scope,
+		RefreshToken:   req.RefreshToken,
 	})
 	if err != nil {
 		writeErr(w, 400, err)

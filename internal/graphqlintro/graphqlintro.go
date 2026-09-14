@@ -5,13 +5,15 @@
 // list and a one-level selection set of the return type's scalar/enum
 // fields.
 //
-// Deliberately shallow, same reasoning as the WSDL and OData importers: it
-// doesn't recursively resolve nested object-typed fields (that selection
-// set would need its own sub-selection, and so on down an arbitrarily deep
-// graph) or fully resolve nested INPUT_OBJECT arguments beyond one level.
-// A one-level query that already parses and only needs its placeholder
-// values replaced covers most of the manual work; deeper resolution is
-// something a user extends by hand from a real, working starting point.
+// Deliberately shallow on the response side, same reasoning as the WSDL and
+// OData importers: it doesn't recursively resolve nested object-typed
+// fields (that selection set would need its own sub-selection, and so on
+// down an arbitrarily deep graph) — a one-level query that already parses
+// and only needs its placeholder values replaced covers most of the manual
+// work; deeper resolution is something a user extends by hand from a real,
+// working starting point. Argument placeholders (argPlaceholder) are fully
+// recursive, though, since an incomplete required input object makes the
+// generated query fail outright rather than just being less convenient.
 package graphqlintro
 
 import (
@@ -199,7 +201,7 @@ func buildRequest(opKeyword string, f field, byName map[string]fullType, endpoin
 	if len(f.Args) > 0 {
 		var args []string
 		for _, a := range f.Args {
-			args = append(args, a.Name+": "+argPlaceholder(a.Type, byName, 0))
+			args = append(args, a.Name+": "+argPlaceholder(a.Type, byName, map[string]bool{}))
 		}
 		fmt.Fprintf(&b, "(%s)", strings.Join(args, ", "))
 	}
@@ -260,15 +262,22 @@ func selectionSet(t typeWrap, byName map[string]fullType, depth int) string {
 // gets one of its real member names (bare, unquoted — GraphQL enum
 // literals aren't strings), a list wraps the single-item placeholder in
 // brackets, and an INPUT_OBJECT gets its required (NON_NULL) fields filled
-// in one level deep — enough that the generated query has a shot at
-// actually validating instead of being rejected for a missing required
-// field, without trying to fully resolve arbitrarily nested input shapes.
-func argPlaceholder(t typeWrap, byName map[string]fullType, depth int) string {
+// in, recursively — enough that the generated query has a shot at actually
+// validating instead of being rejected for a missing required field,
+// however deep that field lives.
+//
+// visiting is the set of INPUT_OBJECT type names already on the current
+// recursion path — input types can be self-referential (a "children:
+// [TreeNodeInput!]" field on TreeNodeInput itself is a completely ordinary
+// shape), so without a cycle guard this would recurse forever on a schema
+// that's valid, just recursive. Hitting a type already being visited stops
+// with "{}" for that branch rather than looping.
+func argPlaceholder(t typeWrap, byName map[string]fullType, visiting map[string]bool) string {
 	if t.Kind == "LIST" && t.OfType != nil {
-		return "[" + argPlaceholder(*t.OfType, byName, depth) + "]"
+		return "[" + argPlaceholder(*t.OfType, byName, visiting) + "]"
 	}
 	if t.Kind == "NON_NULL" && t.OfType != nil {
-		return argPlaceholder(*t.OfType, byName, depth)
+		return argPlaceholder(*t.OfType, byName, visiting)
 	}
 	kind, name := t.underlying()
 	switch kind {
@@ -280,19 +289,21 @@ func argPlaceholder(t typeWrap, byName map[string]fullType, depth int) string {
 		}
 		return "UNKNOWN_ENUM_VALUE"
 	case "INPUT_OBJECT":
-		if depth >= 1 {
-			return "{}" // don't recurse past one level of input object nesting
+		if visiting[name] {
+			return "{}" // self-referential input type — stop rather than recurse forever
 		}
 		it, ok := byName[name]
 		if !ok {
 			return "{}"
 		}
+		visiting[name] = true
+		defer delete(visiting, name)
 		var fields []string
 		for _, inf := range it.InputFields {
 			if !inf.Type.isNonNull() {
 				continue // optional — leaving it out is valid and keeps the placeholder smaller
 			}
-			fields = append(fields, inf.Name+": "+argPlaceholder(inf.Type, byName, depth+1))
+			fields = append(fields, inf.Name+": "+argPlaceholder(inf.Type, byName, visiting))
 		}
 		if len(fields) == 0 {
 			return "{}"

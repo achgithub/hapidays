@@ -27,9 +27,9 @@ type rawCollection struct {
 		Name   string `json:"name"`
 		Schema string `json:"schema"`
 	} `json:"info"`
-	Item      []rawItem     `json:"item"`
-	Variable  []rawKV       `json:"variable"`
-	Auth      *rawAuth      `json:"auth"`
+	Item     []rawItem `json:"item"`
+	Variable []rawKV   `json:"variable"`
+	Auth     *rawAuth  `json:"auth"`
 }
 
 type rawItem struct {
@@ -40,11 +40,11 @@ type rawItem struct {
 }
 
 type rawRequest struct {
-	Method string      `json:"method"`
-	Header rawHeaders  `json:"header"`
-	URL    rawURL      `json:"url"`
-	Auth   *rawAuth    `json:"auth"`
-	Body   *rawBody    `json:"body"`
+	Method string     `json:"method"`
+	Header rawHeaders `json:"header"`
+	URL    rawURL     `json:"url"`
+	Auth   *rawAuth   `json:"auth"`
+	Body   *rawBody   `json:"body"`
 }
 
 // rawHeaders: array of {key,value,disabled} OR legacy newline-delimited string.
@@ -165,8 +165,8 @@ func (a *rawAuth) UnmarshalJSON(b []byte) error {
 }
 
 type rawBody struct {
-	Mode       string `json:"mode"`
-	Raw        string `json:"raw"`
+	Mode       string  `json:"mode"`
+	Raw        string  `json:"raw"`
 	URLEncoded []rawKV `json:"urlencoded"`
 	FormData   []struct {
 		Key      string `json:"key"`

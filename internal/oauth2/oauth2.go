@@ -13,6 +13,8 @@ package oauth2
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -24,7 +26,7 @@ import (
 )
 
 type Params struct {
-	GrantType      string // "client_credentials" | "password" | "authorization_code"
+	GrantType      string // "client_credentials" | "password" | "authorization_code" | "refresh_token"
 	AccessTokenURL string
 	AuthURL        string // required for authorization_code
 	ClientID       string
@@ -32,12 +34,14 @@ type Params struct {
 	Username       string // required for password grant
 	Password       string
 	Scope          string
+	RefreshToken   string // required for refresh_token grant
 }
 
 type Result struct {
-	AccessToken string `json:"accessToken"`
-	TokenType   string `json:"tokenType,omitempty"`
-	ExpiresIn   int    `json:"expiresIn,omitempty"`
+	AccessToken  string `json:"accessToken"`
+	TokenType    string `json:"tokenType,omitempty"`
+	ExpiresIn    int    `json:"expiresIn,omitempty"`
+	RefreshToken string `json:"refreshToken,omitempty"`
 }
 
 // FetchToken handles the single-request grant types. For
@@ -60,9 +64,32 @@ func FetchToken(ctx context.Context, p Params) (*Result, error) {
 			"password":      {p.Password},
 			"scope":         {p.Scope},
 		})
+	case "refresh_token":
+		return exchangeForm(ctx, p.AccessTokenURL, url.Values{
+			"grant_type":    {"refresh_token"},
+			"refresh_token": {p.RefreshToken},
+			"client_id":     {p.ClientID},
+			"client_secret": {p.ClientSecret},
+			"scope":         {p.Scope},
+		})
 	default:
 		return nil, fmt.Errorf("unsupported grant type %q (use Manager for authorization_code)", p.GrantType)
 	}
+}
+
+// pkcePair generates a PKCE (RFC 7636) code_verifier/code_challenge pair
+// for the S256 method — sent unconditionally on every authorization_code
+// flow. A server that doesn't support PKCE just ignores the extra
+// authorize/token params, so there's no compatibility cost to always
+// sending it, and it's what most modern identity providers now require
+// even for a loopback-redirect client like this one.
+func pkcePair() (verifier, challenge string) {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	verifier = base64.RawURLEncoding.EncodeToString(b)
+	sum := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(sum[:])
+	return verifier, challenge
 }
 
 func exchangeForm(ctx context.Context, tokenURL string, form url.Values) (*Result, error) {
@@ -80,11 +107,12 @@ func exchangeForm(ctx context.Context, tokenURL string, form url.Values) (*Resul
 	defer resp.Body.Close()
 
 	var body struct {
-		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		ExpiresIn   int    `json:"expires_in"`
-		Error       string `json:"error"`
-		ErrorDesc   string `json:"error_description"`
+		AccessToken  string `json:"access_token"`
+		TokenType    string `json:"token_type"`
+		ExpiresIn    int    `json:"expires_in"`
+		RefreshToken string `json:"refresh_token"`
+		Error        string `json:"error"`
+		ErrorDesc    string `json:"error_description"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("token endpoint returned non-JSON response (status %d)", resp.StatusCode)
@@ -95,7 +123,7 @@ func exchangeForm(ctx context.Context, tokenURL string, form url.Values) (*Resul
 	if body.AccessToken == "" {
 		return nil, fmt.Errorf("token endpoint returned no access_token (status %d)", resp.StatusCode)
 	}
-	return &Result{AccessToken: body.AccessToken, TokenType: body.TokenType, ExpiresIn: body.ExpiresIn}, nil
+	return &Result{AccessToken: body.AccessToken, TokenType: body.TokenType, ExpiresIn: body.ExpiresIn, RefreshToken: body.RefreshToken}, nil
 }
 
 // Manager tracks in-flight authorization_code exchanges between the Start
@@ -129,7 +157,8 @@ func (m *Manager) Start(p Params) (sessionID, authURL string, err error) {
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
 	state := randomHex(16)
-	authURL, err = buildAuthURL(p.AuthURL, p.ClientID, redirectURI, p.Scope, state)
+	verifier, challenge := pkcePair()
+	authURL, err = buildAuthURL(p.AuthURL, p.ClientID, redirectURI, p.Scope, state, challenge)
 	if err != nil {
 		listener.Close()
 		return "", "", err
@@ -171,6 +200,7 @@ func (m *Manager) Start(p Params) (sessionID, authURL string, err error) {
 			"redirect_uri":  {redirectURI},
 			"client_id":     {p.ClientID},
 			"client_secret": {p.ClientSecret},
+			"code_verifier": {verifier},
 		})
 		finish(result, exErr)
 	})
@@ -210,7 +240,7 @@ func (m *Manager) Wait(ctx context.Context, sessionID string) (*Result, error) {
 	}
 }
 
-func buildAuthURL(authURL, clientID, redirectURI, scope, state string) (string, error) {
+func buildAuthURL(authURL, clientID, redirectURI, scope, state, codeChallenge string) (string, error) {
 	u, err := url.Parse(authURL)
 	if err != nil {
 		return "", fmt.Errorf("parse authorization URL: %w", err)
@@ -223,6 +253,8 @@ func buildAuthURL(authURL, clientID, redirectURI, scope, state string) (string, 
 		q.Set("scope", scope)
 	}
 	q.Set("state", state)
+	q.Set("code_challenge", codeChallenge)
+	q.Set("code_challenge_method", "S256")
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }

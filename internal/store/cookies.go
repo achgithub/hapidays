@@ -47,10 +47,30 @@ func domainMatches(host, cookieDomain string) bool {
 	return host == cookieDomain || strings.HasSuffix(host, "."+cookieDomain)
 }
 
-// CookiesForHost implements client.CookieJar. Path scoping isn't modeled
-// (see model.CookieRecord); every non-expired cookie for a matching domain
-// is sent.
-func (s *Store) CookiesForHost(host string) []*http.Cookie {
+// pathMatches implements RFC 6265 §5.1.4's path-match algorithm. An empty
+// cookiePath (a record from before path-scoping existed, or added by hand
+// with none given) matches everything, same as "/" — the old
+// sent-to-every-path behavior, rather than a silent behavior change for
+// existing data.
+func pathMatches(requestPath, cookiePath string) bool {
+	if cookiePath == "" || cookiePath == "/" || requestPath == cookiePath {
+		return true
+	}
+	if strings.HasPrefix(requestPath, cookiePath) {
+		if strings.HasSuffix(cookiePath, "/") {
+			return true
+		}
+		if len(requestPath) > len(cookiePath) && requestPath[len(cookiePath)] == '/' {
+			return true
+		}
+	}
+	return false
+}
+
+// CookiesForHost implements client.CookieJar: every non-expired cookie
+// whose Domain matches host (exact or subdomain) and whose Path path-
+// matches the outgoing request path.
+func (s *Store) CookiesForHost(host, path string) []*http.Cookie {
 	cookieMu.Lock()
 	records := s.loadCookieRecords()
 	cookieMu.Unlock()
@@ -61,7 +81,7 @@ func (s *Store) CookiesForHost(host string) []*http.Cookie {
 		if !r.Expires.IsZero() && r.Expires.Before(now) {
 			continue
 		}
-		if domainMatches(host, r.Domain) {
+		if domainMatches(host, r.Domain) && pathMatches(path, r.Path) {
 			out = append(out, &http.Cookie{Name: r.Name, Value: r.Value})
 		}
 	}
@@ -86,7 +106,7 @@ func (s *Store) StoreCookies(host string, cookies []*http.Cookie) {
 		}
 		found := false
 		for i, r := range records {
-			if r.Domain == domain && r.Name == c.Name {
+			if r.Domain == domain && r.Path == c.Path && r.Name == c.Name {
 				records[i].Value = c.Value
 				records[i].Expires = c.Expires
 				records[i].Secure = c.Secure
@@ -97,7 +117,7 @@ func (s *Store) StoreCookies(host string, cookies []*http.Cookie) {
 		}
 		if !found {
 			records = append(records, model.CookieRecord{
-				Domain: domain, Name: c.Name, Value: c.Value,
+				Domain: domain, Path: c.Path, Name: c.Name, Value: c.Value,
 				Expires: c.Expires, Secure: c.Secure, HTTPOnly: c.HttpOnly,
 			})
 		}

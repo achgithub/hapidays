@@ -84,6 +84,13 @@ function renderCollectionList() {
     exportBtn.onclick = (e) => { e.stopPropagation(); exportCollection(col.id, col.name); };
     actions.appendChild(exportBtn);
 
+    const exportPostmanBtn = document.createElement('span');
+    exportPostmanBtn.className = 'col-action';
+    exportPostmanBtn.textContent = '⬇P';
+    exportPostmanBtn.title = 'Export as a Postman collection file (opens directly in Postman — best-effort, see the Help panel for what doesn\'t survive the round trip)';
+    exportPostmanBtn.onclick = (e) => { e.stopPropagation(); exportCollectionPostman(col.id, col.name); };
+    actions.appendChild(exportPostmanBtn);
+
     const del = document.createElement('span');
     del.className = 'col-action col-action-danger';
     del.textContent = '✕';
@@ -930,8 +937,11 @@ function renderOAuth2Fields(container, params, rerender) {
     getTokenBtn.disabled = true;
     getTokenBtn.textContent = grantSelect.value === 'authorization_code' ? 'Waiting on browser…' : 'Fetching…';
     try {
-      params.accessToken = await fetchOAuth2Token(params, grantSelect.value);
+      const result = await fetchOAuth2Token(params, grantSelect.value);
+      params.accessToken = result.accessToken;
+      if (result.refreshToken) params.refreshToken = result.refreshToken;
       tokenPreview.value = params.accessToken;
+      refreshTokenBtn.hidden = !params.refreshToken;
     } catch (e) {
       alert('OAuth2 token fetch failed: ' + e.message);
     } finally {
@@ -939,8 +949,35 @@ function renderOAuth2Fields(container, params, rerender) {
       getTokenBtn.textContent = 'Get New Access Token';
     }
   };
+  // Only shown once a grant has actually returned a refresh_token — not
+  // every server issues one, and it means re-running the whole
+  // authorize/token dance isn't the only way to get a live token again.
+  const refreshTokenBtn = document.createElement('button');
+  refreshTokenBtn.textContent = 'Refresh Token';
+  refreshTokenBtn.hidden = !params.refreshToken;
+  refreshTokenBtn.onclick = async () => {
+    refreshTokenBtn.disabled = true;
+    try {
+      const result = await api('/oauth2/token', {
+        method: 'POST',
+        body: JSON.stringify({
+          grantType: 'refresh_token', accessTokenUrl: params.accessTokenUrl,
+          clientId: params.clientId, clientSecret: params.clientSecret,
+          refreshToken: params.refreshToken, scope: params.scope,
+        }),
+      });
+      params.accessToken = result.accessToken;
+      if (result.refreshToken) params.refreshToken = result.refreshToken; // servers commonly rotate it
+      tokenPreview.value = params.accessToken;
+    } catch (e) {
+      alert('OAuth2 token refresh failed: ' + e.message);
+    } finally {
+      refreshTokenBtn.disabled = false;
+    }
+  };
   tokenRow.appendChild(tokenPreview);
   tokenRow.appendChild(getTokenBtn);
+  tokenRow.appendChild(refreshTokenBtn);
   container.appendChild(tokenRow);
 }
 
@@ -954,10 +991,9 @@ async function fetchOAuth2Token(params, grantType) {
       }),
     });
     window.open(start.authUrl, '_blank');
-    const result = await api('/oauth2/authorize/wait', { method: 'POST', body: JSON.stringify({ sessionId: start.sessionId }) });
-    return result.accessToken;
+    return await api('/oauth2/authorize/wait', { method: 'POST', body: JSON.stringify({ sessionId: start.sessionId }) });
   }
-  const result = await api('/oauth2/token', {
+  return await api('/oauth2/token', {
     method: 'POST',
     body: JSON.stringify({
       grantType, accessTokenUrl: params.accessTokenUrl,
@@ -965,7 +1001,6 @@ async function fetchOAuth2Token(params, grantType) {
       username: params.username, password: params.password, scope: params.scope,
     }),
   });
-  return result.accessToken;
 }
 
 function renderBodyFields() {
@@ -1712,6 +1747,7 @@ async function openCookiesModal() {
     <h4>Add a cookie</h4>
     <p class="hint">Seed a cookie by hand — e.g. a session value you obtained some other way — rather than only ever accumulating them from responses.</p>
     <div class="field-row"><label>Domain</label><input type="text" id="newCookieDomain" placeholder="api.example.com"></div>
+    <div class="field-row"><label>Path</label><input type="text" id="newCookiePath" placeholder="/ (leave blank for every path)"></div>
     <div class="field-row"><label>Name</label><input type="text" id="newCookieName" placeholder="session_id"></div>
     <div class="field-row"><label>Value</label><input type="text" id="newCookieValue" placeholder="value"></div>
     <div class="field-row">
@@ -1734,7 +1770,7 @@ async function openCookiesModal() {
       row.className = 'kv-row';
       const flags = [c.secure ? 'Secure' : null, c.httpOnly ? 'HttpOnly' : null].filter(Boolean).join(', ');
       const expires = c.expires && !c.expires.startsWith('0001-01-01') ? ` · expires ${new Date(c.expires).toLocaleString()}` : '';
-      row.innerHTML = `<span style="flex:1">${escapeHtml(c.domain)} — ${escapeHtml(c.name)}=${escapeHtml(c.value)}${flags ? ' (' + flags + ')' : ''}${expires}</span>
+      row.innerHTML = `<span style="flex:1">${escapeHtml(c.domain)}${escapeHtml(c.path || '')} — ${escapeHtml(c.name)}=${escapeHtml(c.value)}${flags ? ' (' + flags + ')' : ''}${expires}</span>
         <button class="remove-row" title="Remove">×</button>`;
       row.querySelector('.remove-row').onclick = async () => {
         await api(`/cookies/${encodeURIComponent(c.domain)}/${encodeURIComponent(c.name)}`, { method: 'DELETE' });
@@ -1756,6 +1792,7 @@ async function openCookiesModal() {
       method: 'PUT',
       body: JSON.stringify({
         domain, name,
+        path: $('#newCookiePath').value.trim(),
         value: $('#newCookieValue').value,
         secure: $('#newCookieSecure').checked,
         httpOnly: $('#newCookieHttpOnly').checked,
@@ -1858,6 +1895,21 @@ async function exportCollection(id, name) {
     return;
   }
   downloadJson(col, (name || 'collection').replace(/[\\/:*?"<>|]/g, '_') + '.hapidays.json');
+}
+
+// Downloads a collection rendered as Postman Collection Format v2.1 —
+// best-effort (see internal/importer/export.go): WS-Security config and
+// gRPC call metadata don't survive, SOAP/gRPC bodies fall back to a raw
+// XML/JSON body since Postman has no equivalent mode for either.
+async function exportCollectionPostman(id, name) {
+  let col;
+  try {
+    col = await api(`/collections/${id}/export/postman`);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+    return;
+  }
+  downloadJson(col, (name || 'collection').replace(/[\\/:*?"<>|]/g, '_') + '.postman_collection.json');
 }
 
 // Same idea as exportCollection — internal/importer.ImportEnvironment

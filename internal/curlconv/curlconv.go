@@ -380,7 +380,7 @@ func bodyContentType(body model.Body) string {
 }
 
 // shellQuote wraps s in single quotes, escaping any embedded single quote
-// with the standard '\'' trick — the only character that needs escaping
+// with the standard '\” trick — the only character that needs escaping
 // inside single-quoted shell text.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"

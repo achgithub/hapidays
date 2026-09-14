@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -68,11 +69,11 @@ func applyAWSSigV4(req *http.Request, params map[string]string, vars map[string]
 }
 
 func canonicalURI(u *url.URL) string {
-	path := u.EscapedPath()
+	path := u.Path
 	if path == "" {
 		return "/"
 	}
-	return path
+	return awsURIEncode(path, false)
 }
 
 func canonicalQuery(u *url.URL) string {
@@ -87,10 +88,35 @@ func canonicalQuery(u *url.URL) string {
 		values := q[k]
 		sort.Strings(values)
 		for _, v := range values {
-			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v))
+			parts = append(parts, awsURIEncode(k, true)+"="+awsURIEncode(v, true))
 		}
 	}
 	return strings.Join(parts, "&")
+}
+
+// awsURIEncode percent-encodes s per AWS's UriEncode() rules (Create a
+// canonical request, in the AWS SigV4 docs): every byte except
+// A-Za-z0-9-._~ is percent-encoded, uppercase hex, space as %20 — not the
+// "+" that url.QueryEscape/EscapedPath would produce, which is the classic
+// wrong-implementation gotcha and would break the signature for any query
+// value containing a space. encodeSlash controls whether '/' itself gets
+// encoded: false for a path (where '/' is a segment separator to keep),
+// true for a query key/value (where AWS wants it encoded like anything
+// else).
+func awsURIEncode(s string, encodeSlash bool) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-', c == '_', c == '.', c == '~':
+			b.WriteByte(c)
+		case c == '/' && !encodeSlash:
+			b.WriteByte(c)
+		default:
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+	return b.String()
 }
 
 func canonicalizeHeaders(req *http.Request) (canonical, signed string) {

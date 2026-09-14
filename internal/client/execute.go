@@ -47,7 +47,7 @@ type Result struct {
 	// substituted — the only faithful way to show "what actually got sent"
 	// for callers (e.g. the step-through runner) that want to display it
 	// without re-implementing Resolve's dynamic-variable handling.
-	ResolvedURL string `json:"resolvedUrl,omitempty"`
+	ResolvedURL string                  `json:"resolvedUrl,omitempty"`
 	Assertions  []model.AssertionResult `json:"assertions,omitempty"`
 }
 
@@ -89,7 +89,7 @@ func dynamicVar(name string) (string, bool) {
 // internal/store in production; kept as an interface so client stays
 // independent of store's file-locking details.
 type CookieJar interface {
-	CookiesForHost(host string) []*http.Cookie
+	CookiesForHost(host, path string) []*http.Cookie
 	StoreCookies(host string, cookies []*http.Cookie)
 }
 
@@ -262,7 +262,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	var jar *recordingJar
 	if opts.Cookies != nil {
 		jar = newRecordingJar()
-		if stored := opts.Cookies.CookiesForHost(req.URL.Hostname()); len(stored) > 0 {
+		if stored := opts.Cookies.CookiesForHost(req.URL.Hostname(), req.URL.Path); len(stored) > 0 {
 			jar.preload(req.URL, stored)
 		}
 		httpClient.Jar = jar
@@ -278,7 +278,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 		challenge := resp.Header.Get("WWW-Authenticate")
 		resp.Body.Close()
 		digestReq, derr := buildRequest(ctx, spec, rawURL, vars, bodyBytes, contentType)
-		if derr == nil && applyDigestAuth(digestReq, challenge, spec.Auth.Params, vars) {
+		if derr == nil && applyDigestAuth(digestReq, challenge, spec.Auth.Params, vars, bodyBytes) {
 			resp, err = httpClient.Do(digestReq)
 			if err != nil {
 				return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL}, nil
@@ -401,11 +401,11 @@ func buildBody(body model.Body, vars map[string]string, settings store.Settings)
 }
 
 const (
-	wsseNS           = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
-	wsuNS            = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
-	passwordTextURI  = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText"
+	wsseNS            = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+	wsuNS             = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+	passwordTextURI   = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText"
 	passwordDigestURI = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest"
-	base64BinaryURI  = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary"
+	base64BinaryURI   = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary"
 )
 
 var (

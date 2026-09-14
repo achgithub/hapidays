@@ -14,12 +14,12 @@ type KV struct {
 type AuthType string
 
 const (
-	AuthNone    AuthType = "none"
-	AuthBasic   AuthType = "basic"
-	AuthBearer  AuthType = "bearer"
-	AuthAPIKey  AuthType = "apikey"
-	AuthInherit AuthType = "inherit"
-	AuthDigest  AuthType = "digest"
+	AuthNone     AuthType = "none"
+	AuthBasic    AuthType = "basic"
+	AuthBearer   AuthType = "bearer"
+	AuthAPIKey   AuthType = "apikey"
+	AuthInherit  AuthType = "inherit"
+	AuthDigest   AuthType = "digest"
 	AuthAWSSigV4 AuthType = "awsv4"
 	// AuthOAuth2 applies a bearer token the same way AuthBearer does; the
 	// token in Params["accessToken"] is fetched ahead of time via
@@ -109,8 +109,8 @@ type GRPCCall struct {
 // "GET X-CSRF-Token: Fetch, then reuse it" pattern without needing a JS
 // engine to run Postman's pm.environment.set() scripts.
 type Capture struct {
-	Source string `json:"source"` // "header" | "body_json"
-	From   string `json:"from"`   // header name, or JSON path like "data.token"
+	Source  string `json:"source"` // "header" | "body_json"
+	From    string `json:"from"`   // header name, or JSON path like "data.token"
 	IntoVar string `json:"intoVar"`
 }
 
@@ -131,14 +131,14 @@ type Assertion struct {
 }
 
 const (
-	AssertStatusEquals    = "status_equals"     // Expected: exact status code, e.g. "200"
-	AssertStatusRange     = "status_range"      // Expected: "2xx" | "3xx" | "4xx" | "5xx"
-	AssertHeaderEquals    = "header_equals"      // Target: header name; Expected: exact value
-	AssertHeaderExists    = "header_exists"      // Target: header name
-	AssertBodyContains    = "body_contains"      // Expected: substring
-	AssertJSONPathEquals  = "json_path_equals"   // Target: dotted path; Expected: string form of the value
-	AssertJSONPathExists  = "json_path_exists"   // Target: dotted path
-	AssertMaxDurationMS   = "max_duration_ms"    // Expected: integer milliseconds
+	AssertStatusEquals   = "status_equals"    // Expected: exact status code, e.g. "200"
+	AssertStatusRange    = "status_range"     // Expected: "2xx" | "3xx" | "4xx" | "5xx"
+	AssertHeaderEquals   = "header_equals"    // Target: header name; Expected: exact value
+	AssertHeaderExists   = "header_exists"    // Target: header name
+	AssertBodyContains   = "body_contains"    // Expected: substring
+	AssertJSONPathEquals = "json_path_equals" // Target: dotted path; Expected: string form of the value
+	AssertJSONPathExists = "json_path_exists" // Target: dotted path
+	AssertMaxDurationMS  = "max_duration_ms"  // Expected: integer milliseconds
 )
 
 // AssertionResult is one evaluated Assertion, returned alongside a Result
@@ -151,13 +151,13 @@ type AssertionResult struct {
 }
 
 type RequestSpec struct {
-	Method  string    `json:"method"`
-	URLRaw  string    `json:"urlRaw"` // may contain {{vars}}; kept verbatim, not re-encoded
-	Query   []KV      `json:"query,omitempty"`
-	Headers []KV      `json:"headers,omitempty"`
-	Auth    Auth      `json:"auth"`
-	Body    Body      `json:"body"`
-	Captures []Capture `json:"captures,omitempty"`
+	Method     string      `json:"method"`
+	URLRaw     string      `json:"urlRaw"` // may contain {{vars}}; kept verbatim, not re-encoded
+	Query      []KV        `json:"query,omitempty"`
+	Headers    []KV        `json:"headers,omitempty"`
+	Auth       Auth        `json:"auth"`
+	Body       Body        `json:"body"`
+	Captures   []Capture   `json:"captures,omitempty"`
 	Assertions []Assertion `json:"assertions,omitempty"`
 
 	// Protocol is a purely descriptive tag for wire protocols that don't
@@ -195,9 +195,9 @@ type Node struct {
 }
 
 type Collection struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Variables []KV      `json:"variables,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Variables []KV   `json:"variables,omitempty"`
 	// Headers are sent on every request in this collection by default — the
 	// common case (auth headers, Accept, a tenant ID) doesn't change between
 	// environments, only per-environment values like host/port/credentials
@@ -244,12 +244,14 @@ type HistoryEntry struct {
 }
 
 // CookieRecord is one persisted cookie, matched against outgoing requests
-// by exact-or-subdomain match on Domain. Path-scoping isn't modeled — v1
-// sends a cookie to every path on a matching domain, which is broader than
-// browsers but fine for the session-cookie-on-one-API-host case this
-// exists for.
+// by exact-or-subdomain match on Domain and RFC 6265 path-match on Path.
+// Path is empty for a cookie set before path-scoping existed, or one added
+// by hand with no path specified — store.pathMatches treats that the same
+// as "/", i.e. sent to every path on the domain, matching the old
+// (broader-than-browsers) behavior rather than silently stopping delivery.
 type CookieRecord struct {
 	Domain   string    `json:"domain"`
+	Path     string    `json:"path,omitempty"`
 	Name     string    `json:"name"`
 	Value    string    `json:"value"`
 	Expires  time.Time `json:"expires,omitempty"`
@@ -259,15 +261,15 @@ type CookieRecord struct {
 
 // RunStepResult is one executed request within a collection run.
 type RunStepResult struct {
-	Iteration  int    `json:"iteration"`
-	NodeID     string  `json:"nodeId"`
-	Name       string  `json:"name"`
-	Method     string  `json:"method"`
-	URL        string  `json:"url"`
-	Status     int     `json:"status"`
-	DurationMS int64   `json:"durationMs"`
-	SizeBytes  int64   `json:"sizeBytes"`
-	Error      string  `json:"error,omitempty"`
+	Iteration  int               `json:"iteration"`
+	NodeID     string            `json:"nodeId"`
+	Name       string            `json:"name"`
+	Method     string            `json:"method"`
+	URL        string            `json:"url"`
+	Status     int               `json:"status"`
+	DurationMS int64             `json:"durationMs"`
+	SizeBytes  int64             `json:"sizeBytes"`
+	Error      string            `json:"error,omitempty"`
 	Assertions []AssertionResult `json:"assertions,omitempty"`
 	// AssertionsPassed is false if any enabled assertion on this step
 	// failed — surfaced separately from Assertions so the runner UI can

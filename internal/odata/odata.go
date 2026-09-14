@@ -38,8 +38,8 @@ type entityType struct {
 }
 
 type entitySet struct {
-	Name         string
-	EntityQName  string // e.g. "ODataDemo.Product"
+	Name        string
+	EntityQName string // e.g. "ODataDemo.Product"
 }
 
 // Import parses an EDMX metadata document and returns a Collection with one
