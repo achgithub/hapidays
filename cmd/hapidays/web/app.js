@@ -77,6 +77,13 @@ function renderCollectionList() {
     settings.onclick = (e) => { e.stopPropagation(); openCollectionSettingsModal(col.id); };
     actions.appendChild(settings);
 
+    const exportBtn = document.createElement('span');
+    exportBtn.className = 'col-action';
+    exportBtn.textContent = '⬇';
+    exportBtn.title = 'Export as a hapidays collection file (re-importable via the Import button, on this machine or another)';
+    exportBtn.onclick = (e) => { e.stopPropagation(); exportCollection(col.id, col.name); };
+    actions.appendChild(exportBtn);
+
     const del = document.createElement('span');
     del.className = 'col-action col-action-danger';
     del.textContent = '✕';
@@ -1801,6 +1808,35 @@ function showModal(html) {
 }
 function closeModal() {
   $('#modalOverlay').classList.add('hidden');
+}
+
+// ---------- export ----------
+
+// Downloads a collection exactly as stored (fetched fresh, not read off
+// state, so an export always reflects the last Save even if this isn't
+// the currently-open collection). It's the same shape the backend already
+// persists to disk, and internal/importer.ImportCollection now recognizes
+// this shape on the way back in — "root" at the top level is what tells
+// it apart from a Postman export — so Import round-trips it as a new,
+// independent collection (fresh IDs throughout) rather than needing a
+// separate re-import path.
+async function exportCollection(id, name) {
+  let col;
+  try {
+    col = await api(`/collections/${id}`);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+    return;
+  }
+  const blob = new Blob([JSON.stringify(col, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (name || 'collection').replace(/[\\/:*?"<>|]/g, '_') + '.hapidays.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ---------- import ----------

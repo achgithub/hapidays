@@ -219,7 +219,21 @@ type rawEnvironment struct {
 
 // ---- public API ----
 
+// ImportCollection accepts either a Postman collection export or a
+// hapidays-native export (see internal/api's collectionExport handler —
+// just the stored model.Collection shape, "root"/"id" at the top level
+// instead of Postman's "info"/"item"). The two are told apart by probing
+// for "root": a Postman export has no such key, a hapidays one always
+// does (even an empty collection has "root": []).
 func ImportCollection(data []byte, newID func() string) (*model.Collection, error) {
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("parse collection: %w", err)
+	}
+	if _, native := probe["root"]; native {
+		return importNativeCollection(data, newID)
+	}
+
 	var rc rawCollection
 	if err := json.Unmarshal(data, &rc); err != nil {
 		return nil, fmt.Errorf("parse collection: %w", err)
@@ -236,6 +250,30 @@ func ImportCollection(data []byte, newID func() string) (*model.Collection, erro
 	}
 	col.Root = convertItems(rc.Item, newID)
 	return col, nil
+}
+
+// importNativeCollection re-imports a previously exported hapidays
+// collection. Every ID (the collection's and every node's) is reassigned
+// rather than reused — re-importing your own export back into the same
+// instance, or importing it into someone else's, must never collide with
+// an existing collection/node ID.
+func importNativeCollection(data []byte, newID func() string) (*model.Collection, error) {
+	var col model.Collection
+	if err := json.Unmarshal(data, &col); err != nil {
+		return nil, fmt.Errorf("parse hapidays collection: %w", err)
+	}
+	col.ID = newID()
+	reassignNodeIDs(col.Root, newID)
+	return &col, nil
+}
+
+func reassignNodeIDs(nodes []*model.Node, newID func() string) {
+	for _, n := range nodes {
+		n.ID = newID()
+		if n.Children != nil {
+			reassignNodeIDs(n.Children, newID)
+		}
+	}
 }
 
 func convertItems(items []rawItem, newID func() string) []*model.Node {
