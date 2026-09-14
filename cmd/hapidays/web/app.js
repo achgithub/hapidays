@@ -73,7 +73,7 @@ function renderCollectionList() {
     const settings = document.createElement('span');
     settings.className = 'col-action';
     settings.textContent = '⚙';
-    settings.title = 'Collection settings (variables & auth)';
+    settings.title = 'Collection settings (headers, variables & auth)';
     settings.onclick = (e) => { e.stopPropagation(); openCollectionSettingsModal(col.id); };
     actions.appendChild(settings);
 
@@ -205,6 +205,7 @@ async function openCollectionSettingsModal(collectionId) {
     ? state.currentCollection
     : await api(`/collections/${collectionId}`);
   const variables = JSON.parse(JSON.stringify(col.variables || []));
+  const headers = JSON.parse(JSON.stringify(col.headers || []));
   const auth = col.auth && col.auth.type ? JSON.parse(JSON.stringify(col.auth)) : { type: 'none', params: {} };
   if (!auth.params) auth.params = {};
 
@@ -212,9 +213,17 @@ async function openCollectionSettingsModal(collectionId) {
     <h3>Collection settings — ${escapeHtml(col.name)}</h3>
 
     <h4>Variables</h4>
-    <p class="hint">Available as {{key}} to every request in this collection.</p>
+    <p class="hint">Available as {{key}} to every request in this collection. For values that change per
+    environment (host, port, credentials), put them in the active Environment instead — the environment's
+    value wins.</p>
     <div id="colVarsTable" class="kv-table"></div>
     <button class="add-row" id="colVarsAddRow">+ Add variable</button>
+
+    <h4>Headers</h4>
+    <p class="hint">Sent on every request in this collection. A request can override one by declaring a header
+    with the same name.</p>
+    <div id="colHeadersTable" class="kv-table"></div>
+    <button class="add-row" id="colHeadersAddRow">+ Add header</button>
 
     <h4>Auth</h4>
     <p class="hint">Used by any request in this collection set to "Inherit from collection".</p>
@@ -241,6 +250,10 @@ async function openCollectionSettingsModal(collectionId) {
   renderVars();
   $('#colVarsAddRow').onclick = () => { variables.push({ key: '', value: '', disabled: false }); renderVars(); };
 
+  const renderHeaders = () => renderKVTable('colHeadersTable', headers);
+  renderHeaders();
+  $('#colHeadersAddRow').onclick = () => { headers.push({ key: '', value: '', disabled: false }); renderHeaders(); };
+
   const rerenderAuth = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerenderAuth);
   $('#colAuthType').value = auth.type;
   rerenderAuth();
@@ -249,6 +262,7 @@ async function openCollectionSettingsModal(collectionId) {
   $('#colSettingsCancel').onclick = closeModal;
   $('#colSettingsSave').onclick = async () => {
     col.variables = variables;
+    col.headers = headers;
     col.auth = auth;
     const saved = await api(`/collections/${col.id}`, { method: 'PUT', body: JSON.stringify(col) });
     if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = saved;
@@ -1285,6 +1299,9 @@ function openEnvEditor() {
 
   showModal(`
     <h3>Environment</h3>
+    <p class="hint">The values that actually differ between Dev/QA/Prod — host, port, credentials, tenant IDs.
+    Anything the same across all of them belongs in the collection's Variables/Headers instead, so switching
+    environments is all it takes.</p>
     <div class="field-row"><label>Name</label><input type="text" id="envNameInput" value="${escapeAttr(env ? env.name : 'New Environment')}"></div>
     <div id="envValuesTable" class="kv-table"></div>
     <button class="add-row" id="envAddRow">+ Add variable</button>
@@ -1873,6 +1890,76 @@ async function importFile(input, endpoint, onDone) {
   input.value = '';
 }
 
+// Fetches a hapidays or Postman file from a URL (e.g. a GitHub raw link)
+// server-side, the same way importFile does for a local file — see
+// importCollectionURL/importEnvironmentURL in internal/api/handlers.go.
+function openImportURLModal(endpoint, onDone, opts) {
+  opts = opts || {};
+  showModal(`
+    <h3>${escapeHtml(opts.title || 'Import from URL')}</h3>
+    <p class="hint">${opts.hint || 'A hapidays or Postman export hosted somewhere fetchable — e.g. a GitHub raw file link.'}</p>
+    <div class="field-row"><label>URL</label><input type="text" id="importUrlInput" style="width:100%"
+      placeholder="https://raw.githubusercontent.com/..." value="${escapeAttr(opts.url || '')}"></div>
+    <div class="modal-actions">
+      <button id="importUrlCancel">Cancel</button>
+      <button id="importUrlGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  $('#importUrlCancel').onclick = closeModal;
+  $('#importUrlGo').onclick = async () => {
+    const url = $('#importUrlInput').value.trim();
+    if (!url) return;
+    try {
+      await api(endpoint, { method: 'POST', body: JSON.stringify({ url }) });
+      await onDone();
+      closeModal();
+    } catch (e) {
+      alert('Import failed: ' + e.message);
+    }
+  };
+}
+
+// ---------- help ----------
+
+const SMOKE_TEST_URL = 'https://raw.githubusercontent.com/achgithub/hapidays-examples/main/smoke-test.hapidays.json';
+
+function openHelpModal() {
+  showModal(`
+    <h3>Help</h3>
+
+    <h4>Collections vs. environments</h4>
+    <p class="hint">A collection is the <em>shape</em> of an API: its requests, the headers/variables it always
+    sends, and the shape of its auth (which type, which header/query param carries it). An environment is the
+    <em>values</em> that differ per target, or are sensitive — host, port, tenant URL, and every credential
+    (password, token, API key, client secret). A credential should always be a <code>{{var}}</code> referencing
+    an environment, never a literal typed into the collection — collections are the thing you export/share,
+    environments are the thing you don't.</p>
+    <p class="hint">Switching between Dev/QA/Prod should just mean switching the environment; nothing about the
+    collection itself should need to change.</p>
+
+    <h4>Example collections</h4>
+    <p class="hint">Kept in a separate GitHub repo (not bundled into hapidays itself) so new examples can show up
+    without a new release: <a href="https://github.com/achgithub/hapidays-examples" target="_blank" rel="noopener">achgithub/hapidays-examples</a>.
+    Use <strong>New → Import from URL…</strong> with a raw file link from that repo, or click below to grab the
+    smoke-test collection directly.</p>
+    <button id="helpImportSmokeTest">Import the smoke-test collection</button>
+
+    <div class="modal-actions">
+      <button id="helpClose" style="background:var(--accent);color:#fff">Close</button>
+    </div>
+  `);
+  $('#helpClose').onclick = closeModal;
+  $('#helpImportSmokeTest').onclick = async () => {
+    try {
+      await api('/collections/import-url', { method: 'POST', body: JSON.stringify({ url: SMOKE_TEST_URL }) });
+      await loadCollections();
+      closeModal();
+    } catch (e) {
+      alert('Import failed: ' + e.message);
+    }
+  };
+}
+
 // ---------- cURL import/export ----------
 
 function openCurlImportModal() {
@@ -2314,9 +2401,17 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importGRPCBtn').onclick = openGRPCImportModal;
   $('#importCurlBtn').onclick = openCurlImportModal;
   $('#copyAsCurlBtn').onclick = openCurlExportModal;
+  $('#importCollectionUrlBtn').onclick = () => openImportURLModal('/collections/import-url', loadCollections, {
+    title: 'Import collection from URL',
+  });
 
   $('#importEnvBtn').onclick = () => $('#importEnvInput').click();
   $('#importEnvInput').onchange = (e) => importFile(e.target, '/environments/import', loadEnvironments);
+  $('#importEnvUrlBtn').onclick = () => openImportURLModal('/environments/import-url', loadEnvironments, {
+    title: 'Import environment from URL',
+  });
+
+  $('#helpBtn').onclick = openHelpModal;
 
   $('#editEnvBtn').onclick = openEnvEditor;
   $('#exportEnvBtn').onclick = () => {

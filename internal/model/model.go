@@ -198,6 +198,13 @@ type Collection struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Variables []KV      `json:"variables,omitempty"`
+	// Headers are sent on every request in this collection by default — the
+	// common case (auth headers, Accept, a tenant ID) doesn't change between
+	// environments, only per-environment values like host/port/credentials
+	// do (see Environment). A request can override any of these by declaring
+	// a header with the same key (case-insensitive) of its own; see
+	// client.MergeHeaders for the exact precedence.
+	Headers   []KV      `json:"headers,omitempty"`
 	Auth      Auth      `json:"auth"` // collection-level default auth
 	Root      []*Node   `json:"root"`
 	UpdatedAt time.Time `json:"updatedAt"`

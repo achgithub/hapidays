@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 
 	"hapidays/internal/api"
-	"hapidays/internal/seed"
 	"hapidays/internal/store"
 )
 
@@ -42,10 +41,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("init store at %s: %v", dir, err)
 	}
-	if err := st.SeedSmokeTestCollection(seed.SmokeTestCollection); err != nil {
-		log.Printf("seed smoke-test collection: %v", err) // non-fatal — app still starts fine without it
-	}
-
 	uiFS, err := fs.Sub(webFS, "web")
 	if err != nil {
 		log.Fatalf("embed web assets: %v", err)

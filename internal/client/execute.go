@@ -102,6 +102,33 @@ type Options struct {
 	// AuthInherit — the collection (there's no per-folder auth in this
 	// model) is the only thing a request can inherit from.
 	CollectionAuth model.Auth
+	// CollectionHeaders are merged under the request's own headers by
+	// MergeHeaders before every send — see Collection.Headers.
+	CollectionHeaders []model.KV
+}
+
+// MergeHeaders combines a collection's default headers with a request's own,
+// a request header overriding the collection header of the same key
+// (case-insensitive, matching HTTP semantics) rather than sending both.
+// Collection headers keep their relative order; a request header with a new
+// key is appended after them, in its own order.
+func MergeHeaders(collectionHeaders, requestHeaders []model.KV) []model.KV {
+	merged := make([]model.KV, 0, len(collectionHeaders)+len(requestHeaders))
+	index := map[string]int{}
+	for _, h := range collectionHeaders {
+		index[strings.ToLower(h.Key)] = len(merged)
+		merged = append(merged, h)
+	}
+	for _, h := range requestHeaders {
+		key := strings.ToLower(h.Key)
+		if i, ok := index[key]; ok {
+			merged[i] = h
+			continue
+		}
+		index[key] = len(merged)
+		merged = append(merged, h)
+	}
+	return merged
 }
 
 // buildTLSConfig builds the TLS config shared by the HTTP client and (for
@@ -190,6 +217,7 @@ func PrepareRequest(ctx context.Context, spec model.RequestSpec, vars map[string
 	if spec.Auth.Type == model.AuthInherit {
 		spec.Auth = opts.CollectionAuth
 	}
+	spec.Headers = MergeHeaders(opts.CollectionHeaders, spec.Headers)
 	rawURL := Resolve(spec.URLRaw, vars)
 	rawURL = applyQueryParams(rawURL, spec.Query, vars)
 	bodyBytes, contentType, err := buildBody(spec.Body, vars, opts.Settings)
@@ -211,6 +239,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	if spec.Auth.Type == model.AuthInherit {
 		spec.Auth = opts.CollectionAuth
 	}
+	spec.Headers = MergeHeaders(opts.CollectionHeaders, spec.Headers)
 
 	rawURL := Resolve(spec.URLRaw, vars)
 	rawURL = applyQueryParams(rawURL, spec.Query, vars)

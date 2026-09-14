@@ -228,8 +228,10 @@ func tokenize(s string) ([]string, error) {
 // Export renders spec as a curl command, resolving {{vars}} the same way
 // a real send would. collectionAuth is substituted in for AuthInherit,
 // mirroring Execute's own resolution — curl has no concept of "inherit
-// from collection".
-func Export(spec model.RequestSpec, vars map[string]string, collectionAuth model.Auth) string {
+// from collection". collectionHeaders are merged in the same way Execute
+// merges them (client.MergeHeaders), so the exported command matches what
+// actually gets sent.
+func Export(spec model.RequestSpec, vars map[string]string, collectionAuth model.Auth, collectionHeaders []model.KV) string {
 	if spec.Body.Mode == model.BodyGRPC {
 		method := ""
 		if spec.Body.GRPC != nil {
@@ -242,6 +244,7 @@ func Export(spec model.RequestSpec, vars map[string]string, collectionAuth model
 	if spec.Auth.Type == model.AuthInherit {
 		spec.Auth = collectionAuth
 	}
+	spec.Headers = client.MergeHeaders(collectionHeaders, spec.Headers)
 
 	rawURL := client.Resolve(spec.URLRaw, vars)
 	rawURL = appendQuery(rawURL, spec.Query, vars)

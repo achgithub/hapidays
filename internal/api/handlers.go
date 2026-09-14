@@ -51,6 +51,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/collections", s.originGuard(s.listCollections))
 	s.mux.HandleFunc("POST /api/collections/import", s.originGuard(s.importCollection))
+	s.mux.HandleFunc("POST /api/collections/import-url", s.originGuard(s.importCollectionURL))
 	s.mux.HandleFunc("POST /api/wsdl/import", s.originGuard(s.importWSDL))
 	s.mux.HandleFunc("POST /api/odata/import", s.originGuard(s.importOData))
 	s.mux.HandleFunc("POST /api/graphql/import", s.originGuard(s.importGraphQL))
@@ -61,6 +62,7 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/environments", s.originGuard(s.listEnvironments))
 	s.mux.HandleFunc("POST /api/environments/import", s.originGuard(s.importEnvironment))
+	s.mux.HandleFunc("POST /api/environments/import-url", s.originGuard(s.importEnvironmentURL))
 	s.mux.HandleFunc("GET /api/environments/{id}", s.originGuard(s.getEnvironment))
 	s.mux.HandleFunc("PUT /api/environments/{id}", s.originGuard(s.saveEnvironment))
 	s.mux.HandleFunc("DELETE /api/environments/{id}", s.originGuard(s.deleteEnvironment))
@@ -162,6 +164,71 @@ func (s *Server) importCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, col)
+}
+
+// importCollectionURL fetches a hapidays or Postman collection file from a
+// public URL (e.g. a GitHub raw link to a shared example) and imports it
+// exactly like a local file drop would — same reasoning as importWSDL's
+// url mode: a browser can't cross-origin-fetch most hosts, so this has to
+// happen server-side.
+func (s *Server) importCollectionURL(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	data, err := fetchRawFile(r.Context(), req.URL)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	col, err := importer.ImportCollection(data, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	col.UpdatedAt = time.Now()
+	if err := s.store.SaveCollection(col); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, col)
+}
+
+// fetchRawFile GETs an arbitrary file over http(s) — used by the "import
+// from URL" flows (a collection or environment shared as a raw file, e.g.
+// on GitHub). Same redirect/scheme restrictions as fetchWSDL.
+func fetchRawFile(ctx context.Context, rawURL string) ([]byte, error) {
+	httpClient := &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("stopped after 5 redirects")
+			}
+			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+				return fmt.Errorf("refusing redirect to non-http(s) scheme %q", req.URL.Scheme)
+			}
+			return nil
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+	if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+		return nil, fmt.Errorf("only http/https URLs are supported")
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch %s: %w", rawURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("fetching %s: server returned HTTP %d", rawURL, resp.StatusCode)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 }
 
 // importWSDL accepts either { "raw": "<wsdl xml>" } (uploaded file content,
@@ -468,6 +535,34 @@ func (s *Server) importEnvironment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, env)
 }
 
+// importEnvironmentURL is importEnvironment's URL-fetch counterpart — see
+// importCollectionURL.
+func (s *Server) importEnvironmentURL(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	data, err := fetchRawFile(r.Context(), req.URL)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	env, err := importer.ImportEnvironment(data, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	env.UpdatedAt = time.Now()
+	if err := s.store.SaveEnvironment(env); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, env)
+}
+
 func (s *Server) getEnvironment(w http.ResponseWriter, r *http.Request) {
 	env, err := s.store.LoadEnvironment(r.PathValue("id"))
 	if err != nil {
@@ -570,6 +665,20 @@ func (s *Server) collectionAuth(collectionID string) model.Auth {
 	return col.Auth
 }
 
+// collectionHeaders loads a collection's default headers, mirroring
+// collectionAuth. Returns nil if collectionID is empty or the collection
+// can't be loaded.
+func (s *Server) collectionHeaders(collectionID string) []model.KV {
+	if collectionID == "" {
+		return nil
+	}
+	col, err := s.store.LoadCollection(collectionID)
+	if err != nil {
+		return nil
+	}
+	return col.Headers
+}
+
 func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	var req sendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -597,6 +706,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		InsecureSkipVerify: req.InsecureSkipVerify,
 		Cookies:            s.store,
 		CollectionAuth:     s.collectionAuth(req.CollectionID),
+		CollectionHeaders:  s.collectionHeaders(req.CollectionID),
 	}
 	var result *client.Result
 	if req.Request.Body.Mode == model.BodyGRPC {
@@ -671,7 +781,7 @@ func (s *Server) curlExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vars := s.resolveVars(req.CollectionID, req.EnvironmentID)
-	curl := curlconv.Export(req.Request, vars, s.collectionAuth(req.CollectionID))
+	curl := curlconv.Export(req.Request, vars, s.collectionAuth(req.CollectionID), s.collectionHeaders(req.CollectionID))
 	writeJSON(w, 200, map[string]string{"curl": curl})
 }
 
@@ -805,6 +915,7 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 			InsecureSkipVerify: req.InsecureSkipVerify,
 			Cookies:            s.store,
 			CollectionAuth:     col.Auth,
+			CollectionHeaders:  col.Headers,
 		},
 	})
 	writeJSON(w, 200, results)
@@ -877,7 +988,7 @@ func (s *Server) odataBatch(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 
-	clientOpts := client.Options{Settings: settings, Cookies: s.store, CollectionAuth: col.Auth}
+	clientOpts := client.Options{Settings: settings, Cookies: s.store, CollectionAuth: col.Auth, CollectionHeaders: col.Headers}
 	httpReqs := make([]*http.Request, 0, len(leaves))
 	for _, leaf := range leaves {
 		hr, err := client.PrepareRequest(ctx, *leaf.Request, vars, clientOpts)
