@@ -1862,6 +1862,7 @@ function showModal(html) {
 }
 function closeModal() {
   $('#modalOverlay').classList.add('hidden');
+  $('#modalContent').classList.remove('modal-wide');
 }
 
 // ---------- export ----------
@@ -1976,24 +1977,162 @@ function openImportURLModal(endpoint, onDone, opts) {
 const SMOKE_TEST_URL = 'https://raw.githubusercontent.com/achgithub/hapidays-examples/main/smoke-test.hapidays.json';
 
 function openHelpModal() {
+  $('#modalContent').classList.add('modal-wide');
   showModal(`
     <h3>Help</h3>
+    <p class="hint">A guide to everything hapidays does. Jump to a section, or just scroll — it's not long
+    relative to what it's documenting.</p>
 
+    <nav class="help-nav">
+      <a href="#help-model">Collections vs. environments</a>
+      <a href="#help-request">Building a request</a>
+      <a href="#help-body">Body modes</a>
+      <a href="#help-auth">Auth</a>
+      <a href="#help-capassert">Captures &amp; assertions</a>
+      <a href="#help-collections">Collections</a>
+      <a href="#help-environments">Environments</a>
+      <a href="#help-running">Sending &amp; running</a>
+      <a href="#help-history">History</a>
+      <a href="#help-cookies">Cookie jar</a>
+      <a href="#help-settings">Settings &amp; network</a>
+      <a href="#help-palette">Command palette</a>
+      <a href="#help-examples">Example collections</a>
+    </nav>
+
+    <div id="help-model" class="help-eyebrow">Model</div>
     <h4>Collections vs. environments</h4>
     <p class="hint">A collection is the <em>shape</em> of an API: its requests, the headers/variables it always
     sends, and the shape of its auth (which type, which header/query param carries it). An environment is the
     <em>values</em> that differ per target, or are sensitive — host, port, tenant URL, and every credential
     (password, token, API key, client secret). A credential should always be a <code>{{var}}</code> referencing
     an environment, never a literal typed into the collection — collections are the thing you export/share,
-    environments are the thing you don't.</p>
-    <p class="hint">Switching between Dev/QA/Prod should just mean switching the environment; nothing about the
-    collection itself should need to change.</p>
+    environments are the thing you don't. Switching between Dev/QA/Prod should just mean switching the
+    environment; nothing about the collection itself should need to change.</p>
 
+    <div id="help-request" class="help-eyebrow">Requests</div>
+    <h4>Building a request</h4>
+    <p class="hint">The protocol chip above the URL bar (HTTP / SOAP / OData / GraphQL / gRPC) is purely
+    descriptive — it drives which fields show up and how the request is tagged in the tree, not how the request
+    executes. The URL itself can be typed as one raw string with <code>{{vars}}</code> inline, or composed from
+    separate domain/port/path fields that stay in sync with it. Query params, Headers, Body, Auth, Captures, and
+    Assertions are their own tabs, each badged with a count when it has content, so a request with something set
+    in a tab you're not looking at is still visible at a glance.</p>
+
+    <div id="help-body" class="help-eyebrow">Requests</div>
+    <h4>Body modes</h4>
+    <dl class="help-dl">
+      <dt>Raw</dt><dd>JSON / XML / text / HTML, syntax-highlighted by the language you pick.</dd>
+      <dt>URL-encoded</dt><dd>A key/value form body, sent as <code>application/x-www-form-urlencoded</code>.</dd>
+      <dt>Form-data</dt><dd>Multipart form fields, including file fields.</dd>
+      <dt>GraphQL</dt><dd>Query/variables editor, posted as the standard <code>{"query","variables"}</code> JSON body.</dd>
+      <dt>SOAP</dt><dd>1.1 or 1.2 envelope, with an optional WS-Security UsernameToken (plaintext or digest
+        password) and X.509 message signing (signs the Body using the mTLS client cert configured in Settings).</dd>
+      <dt>gRPC</dt><dd>Target host:port, plaintext/TLS toggle, full method, a protojson request editor, and
+        outgoing metadata — built automatically by the gRPC reflection importer, or filled in by hand.</dd>
+    </dl>
+
+    <div id="help-auth" class="help-eyebrow">Requests</div>
+    <h4>Auth tab</h4>
+    <p class="hint">Every request has its own Auth tab, independent of its body. <strong>Inherit from
+    collection</strong> falls back to whatever the open collection's own Auth is set to (there's no per-folder
+    auth) — set it once on the collection and every request that inherits picks it up.</p>
+    <dl class="help-dl">
+      <dt>Basic / Bearer / Digest</dt><dd>Digest handles the challenge/response round trip transparently — fill
+        in username/password and send, same as any other type.</dd>
+      <dt>API Key</dt><dd>A named header or query param, your choice of placement.</dd>
+      <dt>AWS Signature (SigV4)</dt><dd>Access key, secret key, optional session token (for temporary STS
+        credentials), region, service.</dd>
+      <dt>OAuth 2.0</dt><dd>Client Credentials, Username &amp; Password, or Authorization Code (opens a browser
+        tab, listens on a one-shot local port for the redirect). <strong>Get New Access Token</strong> fetches
+        one; once a grant returns a refresh token, a <strong>Refresh Token</strong> button appears so you don't
+        need to re-run the whole browser flow just because the token expired.</dd>
+    </dl>
+
+    <div id="help-capassert" class="help-eyebrow">Requests</div>
+    <h4>Captures &amp; assertions</h4>
+    <p class="hint"><strong>Captures</strong> pull a value out of the response — a header, or a dotted JSON path
+    like <code>data.token</code> — into an environment variable, for the common "fetch a token, reuse it on the
+    next request" pattern, without needing a scripting engine. If you imported a Postman collection whose
+    pre-request/test scripts do this with <code>pm.environment.set(...)</code>, <strong>Suggest Captures</strong>
+    (on the Captures tab) recognizes the common inline forms and offers to convert them into Capture rules
+    automatically.</p>
+    <p class="hint"><strong>Assertions</strong> are pass/fail checks against the response, evaluated without a
+    scripting engine: status code equals or in a range, a header equals/exists, the body contains a substring, a
+    JSON path equals a value or exists, or the response came back under a max duration. These are what let the
+    collection runner report pass/fail per request instead of just "here's what came back."</p>
+
+    <div id="help-collections" class="help-eyebrow">Organizing</div>
+    <h4>Collections</h4>
+    <p class="hint">A tree of folders and requests. The <strong>New</strong> menu creates a request/folder/
+    collection by hand, or imports one: a Postman collection file, WSDL (SOAP), OData <code>$metadata</code>,
+    GraphQL introspection, gRPC server reflection, a pasted curl command, or <strong>Import from URL</strong> —
+    fetches a hapidays or Postman file from any reachable link, server-side, the same mechanism WSDL-by-URL
+    import uses (so a shared example doesn't need downloading by hand first).</p>
+    <p class="hint">The <strong>⚙</strong> icon on a collection opens its settings — Headers and Variables sent
+    by default to every request in it (a request can override a header by declaring one with the same name), and
+    the collection's own Auth. <strong>⬇</strong> exports it as hapidays's native JSON (round-trips losslessly,
+    re-importable on this machine or another); <strong>⬇P</strong> exports it as a Postman v2.1 file instead,
+    best-effort — SOAP/gRPC bodies fall back to raw XML/JSON since Postman has no equivalent mode, and
+    hapidays's own collection-level Headers have no Postman equivalent so they're dropped on that path only.</p>
+
+    <div id="help-environments" class="help-eyebrow">Organizing</div>
+    <h4>Environments</h4>
+    <p class="hint">A named set of variable values, plus an optional mTLS client cert/key override for when one
+    environment (e.g. prod) needs a different client identity than the one configured globally in Settings. The
+    dropdown in the sidebar switches the active one; <strong>Duplicate</strong> (when editing an existing
+    environment) starts a new one pre-filled with the same variables — the fast way to build a Test environment
+    out of Dev without retyping everything. Import/Export mirror the collection versions (file or URL).</p>
+
+    <div id="help-running" class="help-eyebrow">Executing</div>
+    <h4>Sending &amp; running</h4>
+    <dl class="help-dl">
+      <dt>Send</dt><dd>Runs the one open request against the active environment.</dd>
+      <dt>Run (▶ on a collection or folder)</dt><dd>Runs every request in it, in tree order. Optionally once
+        per row of a CSV or JSON-array data file (each row's keys become variables for that iteration, taking
+        precedence over the collection/environment ones), with a configurable delay between requests. Doesn't
+        stop on a failed request — a run is meant to survey a whole collection, not bail on the first 4xx.</dd>
+      <dt>Step through…</dt><dd>The same run, but one request at a time with a Next button — for watching what
+        each step actually sent/got back instead of only seeing the final summary.</dd>
+      <dt>Send as $batch</dt><dd>(OData collections) Bundles every request in a folder into one
+        <code>multipart/mixed</code> $batch HTTP call — GET requests sent directly, state-changing ones wrapped
+        in their own changeset — and shows the individual sub-responses.</dd>
+    </dl>
+
+    <div id="help-history" class="help-eyebrow">Executing</div>
+    <h4>History</h4>
+    <p class="hint">Every send is logged — method, URL, status, duration, size — and can be reopened back into
+    the editor to inspect or re-send. Best-effort restores the collection/environment it ran under too, so
+    <code>{{vars}}</code> resolve the same way they did the first time.</p>
+
+    <div id="help-cookies" class="help-eyebrow">Executing</div>
+    <h4>Cookie jar</h4>
+    <p class="hint">Cookies a response sets are captured and replayed on later requests automatically, matched
+    by domain (exact or subdomain) and path, the way a browser would. The cookie jar (icon next to Help) lists
+    everything currently stored, lets you delete one or clear all, or add one by hand — useful for seeding a
+    session value you obtained some other way rather than only ever accumulating them from responses.</p>
+
+    <div id="help-settings" class="help-eyebrow">Configuration</div>
+    <h4>Settings &amp; network</h4>
+    <p class="hint">Global, machine-wide config (the gear icon): a client cert/key pair for mutual TLS (a per-
+    environment override is available for when one target needs a different identity), an extra CA bundle for
+    internal/self-signed chains, an HTTP(S) proxy URL, and a skip-TLS-verification override for the "I know this
+    cert is bad, let me through anyway" case — flagged with a persistent warning dot on the gear icon while it's
+    on, so it's hard to leave enabled by accident.</p>
+
+    <div id="help-palette" class="help-eyebrow">Configuration</div>
+    <h4>Command palette (⌘K)</h4>
+    <p class="hint">Searches everything — every request across every collection (including inside collapsed
+    folders, unlike the sidebar filter box), plus actions like switching environments — and jumps straight to
+    it. The sidebar filter box only searches the currently open collection's visible tree; ⌘K is for "I know
+    what I'm looking for, I don't know where it is."</p>
+
+    <div id="help-examples" class="help-eyebrow">Configuration</div>
     <h4>Example collections</h4>
     <p class="hint">Kept in a separate GitHub repo (not bundled into hapidays itself) so new examples can show up
     without a new release: <a href="https://github.com/achgithub/hapidays-examples" target="_blank" rel="noopener">achgithub/hapidays-examples</a>.
     Use <strong>New → Import from URL…</strong> with a raw file link from that repo, or click below to grab the
-    smoke-test collection directly.</p>
+    smoke-test collection directly — it exercises most of the auth types and body modes above against public
+    test endpoints, a working example of each rather than just a description of it.</p>
     <button id="helpImportSmokeTest">Import the smoke-test collection</button>
 
     <div class="modal-actions">
