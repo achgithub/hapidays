@@ -67,12 +67,15 @@
       <div class="util-row-label">
         <span>Environment</span>
         <div class="btn-row">
-          <button id="importEnvBtn" class="text-link" title="Import Postman environment">Import</button>
+          <button id="importEnvBtn" class="text-link" title="Import a Postman or hapidays environment file">Import</button>
         </div>
       </div>
       <input id="importEnvInput" type="file" accept=".json" hidden>
       <div class="env-row">
         <select id="envSelect" class="env-select"><option value="">No environment</option></select>
+        <button id="exportEnvBtn" class="icon-btn bordered" title="Export the selected environment as a hapidays file" aria-label="Export environment">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+        </button>
         <button id="editEnvBtn" class="icon-btn bordered" title="Edit variables" aria-label="Edit environment variables">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </button>

@@ -1812,6 +1812,18 @@ function closeModal() {
 
 // ---------- export ----------
 
+function downloadJson(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Downloads a collection exactly as stored (fetched fresh, not read off
 // state, so an export always reflects the last Save even if this isn't
 // the currently-open collection). It's the same shape the backend already
@@ -1828,15 +1840,22 @@ async function exportCollection(id, name) {
     alert('Export failed: ' + e.message);
     return;
   }
-  const blob = new Blob([JSON.stringify(col, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = (name || 'collection').replace(/[\\/:*?"<>|]/g, '_') + '.hapidays.json';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadJson(col, (name || 'collection').replace(/[\\/:*?"<>|]/g, '_') + '.hapidays.json');
+}
+
+// Same idea as exportCollection — internal/importer.ImportEnvironment
+// recognizes this shape by the presence of "updatedAt" (every hapidays
+// environment has it; a Postman export never does) and reassigns a fresh
+// ID on the way back in.
+async function exportEnvironment(id, name) {
+  let env;
+  try {
+    env = await api(`/environments/${id}`);
+  } catch (e) {
+    alert('Export failed: ' + e.message);
+    return;
+  }
+  downloadJson(env, (name || 'environment').replace(/[\\/:*?"<>|]/g, '_') + '.hapidays.json');
 }
 
 // ---------- import ----------
@@ -2300,6 +2319,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importEnvInput').onchange = (e) => importFile(e.target, '/environments/import', loadEnvironments);
 
   $('#editEnvBtn').onclick = openEnvEditor;
+  $('#exportEnvBtn').onclick = () => {
+    if (!state.currentEnvironmentId) { alert('Select an environment first.'); return; }
+    const env = state.environments.find(e => e.id === state.currentEnvironmentId);
+    exportEnvironment(state.currentEnvironmentId, env && env.name);
+  };
   $('#settingsBtn').onclick = openSettings;
   $('#cookiesBtn').onclick = openCookiesModal;
   $('#suggestCapturesBtn').onclick = runSuggestCaptures;

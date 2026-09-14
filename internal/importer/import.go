@@ -353,7 +353,30 @@ func convertBody(b rawBody) model.Body {
 	return body
 }
 
+// ImportEnvironment accepts either a Postman environment export or a
+// hapidays-native export (see internal/api's environmentExport handler —
+// just the stored model.Environment shape). Told apart by probing for
+// "updatedAt": every hapidays environment carries it (no omitempty on that
+// field), and a Postman export never does. Getting this wrong would be a
+// silent-data-loss bug, not just a parse error — rawEnvironment's Values
+// use "enabled" where the native shape uses "disabled", so feeding a
+// native export through the Postman path would silently import every
+// variable as disabled (Enabled defaults to false when the key isn't
+// found, so Disabled: !v.Enabled comes out true for all of them).
 func ImportEnvironment(data []byte, newID func() string) (*model.Environment, error) {
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("parse environment: %w", err)
+	}
+	if _, native := probe["updatedAt"]; native {
+		var env model.Environment
+		if err := json.Unmarshal(data, &env); err != nil {
+			return nil, fmt.Errorf("parse hapidays environment: %w", err)
+		}
+		env.ID = newID()
+		return &env, nil
+	}
+
 	var re rawEnvironment
 	if err := json.Unmarshal(data, &re); err != nil {
 		return nil, fmt.Errorf("parse environment: %w", err)
