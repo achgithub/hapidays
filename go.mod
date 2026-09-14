@@ -1,8 +1,8 @@
 module hapidays
 
-go 1.25.0
+go 1.27.0
 
-toolchain go1.25.1
+toolchain go1.27.1
 
 require (
 	github.com/beevik/etree v1.7.0
