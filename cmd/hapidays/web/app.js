@@ -2065,9 +2065,11 @@ function openHelpModal() {
     <h4>Collections</h4>
     <p class="hint">A tree of folders and requests. The <strong>New</strong> menu creates a request/folder/
     collection by hand, or imports one: a Postman collection file, WSDL (SOAP), OData <code>$metadata</code>,
-    GraphQL introspection, gRPC server reflection, a pasted curl command, or <strong>Import from URL</strong> —
-    fetches a hapidays or Postman file from any reachable link, server-side, the same mechanism WSDL-by-URL
-    import uses (so a shared example doesn't need downloading by hand first).</p>
+    GraphQL introspection, gRPC server reflection, an <strong>OpenAPI 3.0/3.1 or Swagger 2.0</strong> document
+    (JSON or YAML — generates a folder per tag, one request per operation, and a matching Environment per
+    server the spec declares), a pasted curl command, or <strong>Import from URL</strong> — fetches a hapidays
+    or Postman file from any reachable link, server-side, the same mechanism WSDL-by-URL import uses (so a
+    shared example doesn't need downloading by hand first).</p>
     <p class="hint">The <strong>⚙</strong> icon on a collection opens its settings — Headers and Variables sent
     by default to every request in it (a request can override a header by declaring one with the same name), and
     the collection's own Auth. <strong>⬇</strong> exports it as hapidays's native JSON (round-trips losslessly,
@@ -2289,6 +2291,57 @@ function openODataImportModal() {
       closeModal();
     } catch (e) {
       alert('OData import failed: ' + e.message);
+    }
+  };
+}
+
+// ---------- OpenAPI / Swagger import ----------
+
+function openOpenAPIImportModal() {
+  const auth = { type: 'none', params: {} };
+  showModal(`
+    <h3>Import OpenAPI / Swagger</h3>
+    <p class="hint">Accepts OpenAPI 3.0/3.1 or Swagger 2.0, JSON or YAML. Generates one request per operation,
+    grouped into folders by tag, with example values filled in from the spec's schemas — and, since a spec
+    describes its own auth, a matching Environment per server it declares (with placeholder credential values;
+    see the Help panel's "Collections vs. environments" section for why those aren't collection variables).</p>
+    <div class="field-row"><label>Spec URL</label><input type="text" id="openapiUrlInput" placeholder="https://host/openapi.json"></div>
+    <label>Auth (only needed if the service gates the spec document itself)</label>
+    <select id="openapiAuthType">
+      <option value="none">No Auth</option>
+      <option value="basic">Basic Auth</option>
+      <option value="bearer">Bearer Token</option>
+      <option value="apikey">API Key</option>
+    </select>
+    <div id="openapiAuthFields"></div>
+    <p class="hint">...or upload a spec file instead:</p>
+    <input type="file" id="openapiFileInput" accept=".json,.yaml,.yml">
+    <div class="modal-actions">
+      <button id="openapiImportCancel">Cancel</button>
+      <button id="openapiImportGo" style="background:var(--accent);color:#fff">Import</button>
+    </div>
+  `);
+  const renderFields = () => populateAuthFields(auth.type, auth.params, $('#openapiAuthFields'), renderFields);
+  renderFields();
+  $('#openapiAuthType').onchange = (e) => { auth.type = e.target.value; renderFields(); };
+  $('#openapiImportCancel').onclick = closeModal;
+  $('#openapiImportGo').onclick = async () => {
+    const url = $('#openapiUrlInput').value.trim();
+    const file = $('#openapiFileInput').files[0];
+    if (!url && !file) { alert('Provide a spec URL or choose a file to upload.'); return; }
+    const payload = { url, auth };
+    if (file) payload.raw = await file.text();
+    try {
+      const result = await api('/openapi/import', { method: 'POST', body: JSON.stringify(payload) });
+      await loadCollections();
+      await loadEnvironments();
+      closeModal();
+      const envCount = (result.environments || []).length;
+      if (envCount > 0) {
+        alert(`Imported "${result.collection.name}" and ${envCount} environment${envCount === 1 ? '' : 's'} — fill in the placeholder credential values before sending.`);
+      }
+    } catch (e) {
+      alert('OpenAPI import failed: ' + e.message);
     }
   };
 }
@@ -2588,6 +2641,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
   $('#importWsdlBtn').onclick = openWsdlImportModal;
   $('#importODataBtn').onclick = openODataImportModal;
+  $('#importOpenAPIBtn').onclick = openOpenAPIImportModal;
   $('#importGraphQLBtn').onclick = openGraphQLImportModal;
   $('#importGRPCBtn').onclick = openGRPCImportModal;
   $('#importCurlBtn').onclick = openCurlImportModal;

@@ -27,6 +27,7 @@ import (
 	"hapidays/internal/oauth2"
 	"hapidays/internal/odata"
 	"hapidays/internal/odatabatch"
+	"hapidays/internal/openapi"
 	"hapidays/internal/runner"
 	"hapidays/internal/store"
 	"hapidays/internal/wsdl"
@@ -55,6 +56,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/wsdl/import", s.originGuard(s.importWSDL))
 	s.mux.HandleFunc("POST /api/odata/import", s.originGuard(s.importOData))
 	s.mux.HandleFunc("POST /api/graphql/import", s.originGuard(s.importGraphQL))
+	s.mux.HandleFunc("POST /api/openapi/import", s.originGuard(s.importOpenAPI))
 	s.mux.HandleFunc("POST /api/grpc/import", s.originGuard(s.importGRPC))
 	s.mux.HandleFunc("GET /api/collections/{id}/export/postman", s.originGuard(s.exportCollectionPostman))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
@@ -375,6 +377,81 @@ func (s *Server) importOData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, col)
+}
+
+// importOpenAPI accepts either { "raw": "<spec JSON/YAML>" } (an uploaded
+// file, read client-side and posted as text) or { "url": "...", "auth":
+// {...} } (fetched here via client.Execute — same reasoning as
+// importOData: some gateways gate the spec document itself behind the same
+// auth as the API it describes). Unlike every other importer, this can
+// produce more than one Environment (one per server the spec declares)
+// alongside the collection — see internal/openapi's doc comment for why
+// credentials always land there, never in the collection itself.
+func (s *Server) importOpenAPI(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Raw  string     `json:"raw"`
+		URL  string     `json:"url"`
+		Auth model.Auth `json:"auth"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+
+	data := []byte(req.Raw)
+	if req.URL != "" {
+		settings, err := s.store.LoadSettings()
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		specSpec := model.RequestSpec{
+			Method:  "GET",
+			URLRaw:  req.URL,
+			Auth:    req.Auth,
+			Body:    model.Body{Mode: model.BodyNone},
+			Headers: []model.KV{{Key: "Accept", Value: "application/json, application/yaml, text/yaml, */*"}},
+		}
+		result, err := client.Execute(ctx, specSpec, map[string]string{}, client.Options{Settings: settings})
+		if err != nil {
+			writeErr(w, 500, fmt.Errorf("fetch OpenAPI document: %w", err))
+			return
+		}
+		if result.Error != "" {
+			writeErr(w, 400, fmt.Errorf("fetch OpenAPI document: %s", result.Error))
+			return
+		}
+		if result.Status != 200 {
+			writeErr(w, 400, fmt.Errorf("fetching OpenAPI document: server returned HTTP %d — check the URL and auth", result.Status))
+			return
+		}
+		data = []byte(result.Body)
+	}
+	if len(data) == 0 {
+		writeErr(w, 400, fmt.Errorf("no OpenAPI/Swagger document provided (neither raw text nor a fetchable url)"))
+		return
+	}
+
+	col, envs, err := openapi.Import(data, req.URL, store.NewID)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	col.UpdatedAt = time.Now()
+	if err := s.store.SaveCollection(col); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	for _, env := range envs {
+		env.UpdatedAt = time.Now()
+		if err := s.store.SaveEnvironment(env); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+	}
+	writeJSON(w, 200, map[string]any{"collection": col, "environments": envs})
 }
 
 // importGraphQL POSTs the standard GraphQL introspection query to the
