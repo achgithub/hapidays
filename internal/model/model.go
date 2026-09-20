@@ -50,7 +50,8 @@ const (
 type FormField struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
-	Type     string `json:"type"` // "text" | "file"
+	Type     string `json:"type"`          // "text" | "file"
+	Src      string `json:"src,omitempty"` // local file path, only used when Type == "file"
 	Disabled bool   `json:"disabled,omitempty"`
 }
 
@@ -76,6 +77,15 @@ type Body struct {
 	// lives here; the cert/key paths stay in Settings so a private key
 	// path never ends up in collection JSON.
 	SignBody bool `json:"signBody,omitempty"`
+
+	// GraphQLQuery/GraphQLVariables hold the split editor fields when
+	// Mode == graphql — GraphQLQuery is GraphQL query/mutation syntax,
+	// GraphQLVariables is a JSON object as text. buildBody assembles them
+	// into the standard {"query":...,"variables":...} POST payload at send
+	// time; neither is valid JSON/GraphQL on its own, so they're never fed
+	// through Resolve+json.Unmarshal until send.
+	GraphQLQuery     string `json:"graphqlQuery,omitempty"`
+	GraphQLVariables string `json:"graphqlVariables,omitempty"`
 
 	// GRPC carries the call details when Mode == grpc. gRPC isn't an HTTP
 	// body — this struct is a fully separate call description, dispatched

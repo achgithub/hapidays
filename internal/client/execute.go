@@ -21,6 +21,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -350,8 +351,31 @@ func applyQueryParams(rawURL string, query []model.KV, vars map[string]string) s
 
 func buildBody(body model.Body, vars map[string]string, settings store.Settings) ([]byte, string, error) {
 	switch body.Mode {
-	case model.BodyRaw, model.BodyGraphQL:
+	case model.BodyRaw:
 		return []byte(Resolve(body.Raw, vars)), rawLanguageToContentType(body.RawLanguage), nil
+	case model.BodyGraphQL:
+		if body.GraphQLQuery == "" && body.Raw != "" {
+			// Collections saved before the split query/variables editor
+			// stored the already-assembled {"query","variables"} JSON
+			// directly in Raw — keep sending that until it's resaved
+			// through the new fields.
+			return []byte(Resolve(body.Raw, vars)), rawLanguageToContentType(body.RawLanguage), nil
+		}
+		variables := json.RawMessage("null")
+		if v := strings.TrimSpace(Resolve(body.GraphQLVariables, vars)); v != "" {
+			if !json.Valid([]byte(v)) {
+				return nil, "", fmt.Errorf("GraphQL variables must be valid JSON: %s", v)
+			}
+			variables = json.RawMessage(v)
+		}
+		payload, err := json.Marshal(struct {
+			Query     string          `json:"query"`
+			Variables json.RawMessage `json:"variables"`
+		}{Query: Resolve(body.GraphQLQuery, vars), Variables: variables})
+		if err != nil {
+			return nil, "", fmt.Errorf("build GraphQL payload: %w", err)
+		}
+		return payload, "application/json", nil
 	case model.BodySoap:
 		envelope := Resolve(body.Raw, vars)
 		if body.WsSecurityMode != "" {
@@ -385,11 +409,24 @@ func buildBody(body model.Body, vars map[string]string, settings store.Settings)
 				continue
 			}
 			if f.Type == "file" {
-				// File contents aren't stored in the collection; the field
-				// is written as empty. The UI attaches real file bytes via
-				// a separate upload path in a later version.
-				part, _ := mw.CreateFormFile(Resolve(f.Key, vars), "")
-				_ = part
+				src := Resolve(f.Src, vars)
+				if src == "" {
+					continue
+				}
+				file, err := os.Open(src)
+				if err != nil {
+					return nil, "", fmt.Errorf("form field %q: open %s: %w", f.Key, src, err)
+				}
+				part, err := mw.CreateFormFile(Resolve(f.Key, vars), filepath.Base(src))
+				if err != nil {
+					file.Close()
+					return nil, "", fmt.Errorf("form field %q: %w", f.Key, err)
+				}
+				_, err = io.Copy(part, file)
+				file.Close()
+				if err != nil {
+					return nil, "", fmt.Errorf("form field %q: read %s: %w", f.Key, src, err)
+				}
 				continue
 			}
 			_ = mw.WriteField(Resolve(f.Key, vars), Resolve(f.Value, vars))

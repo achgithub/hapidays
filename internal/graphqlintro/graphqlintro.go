@@ -211,16 +211,14 @@ func buildRequest(opKeyword string, f field, byName map[string]fullType, endpoin
 	}
 	b.WriteString("\n}")
 
-	payload, _ := json.Marshal(map[string]string{"query": b.String()})
-
 	return &model.RequestSpec{
 		Method: "POST",
 		URLRaw: endpointURL,
 		Auth:   model.Auth{Type: model.AuthInherit},
 		Body: model.Body{
-			Mode:        model.BodyGraphQL,
-			Raw:         string(payload),
-			RawLanguage: "json",
+			Mode:             model.BodyGraphQL,
+			GraphQLQuery:     b.String(),
+			GraphQLVariables: "{}",
 		},
 	}
 }

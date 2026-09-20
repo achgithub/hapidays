@@ -12,6 +12,7 @@
 package curlconv
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -83,13 +84,14 @@ func Parse(cmd string) (*model.RequestSpec, error) {
 		case t == "--url":
 			rawURL = next()
 		case t == "-F" || t == "--form":
-			// Best-effort form-data support: key=value only (a @filename
-			// value can't be represented since curl's import can't read
-			// the filesystem it was copied from).
 			f := next()
 			if k, v, ok := strings.Cut(f, "="); ok {
 				spec.Body.Mode = model.BodyFormData
-				spec.Body.FormData = append(spec.Body.FormData, model.FormField{Key: k, Value: v, Type: "text"})
+				if src, isFile := strings.CutPrefix(v, "@"); isFile {
+					spec.Body.FormData = append(spec.Body.FormData, model.FormField{Key: k, Type: "file", Src: src})
+				} else {
+					spec.Body.FormData = append(spec.Body.FormData, model.FormField{Key: k, Value: v, Type: "text"})
+				}
 			}
 		case strings.HasPrefix(t, "-") && len(t) > 0:
 			// An unrecognized flag. If the next token looks like its value
@@ -298,8 +300,10 @@ func Export(spec model.RequestSpec, vars map[string]string, collectionAuth model
 		fmt.Fprintf(&b, " \\\n  -H %s", shellQuote("Content-Type: "+ct))
 	}
 	switch spec.Body.Mode {
-	case model.BodyRaw, model.BodyGraphQL:
+	case model.BodyRaw:
 		fmt.Fprintf(&b, " \\\n  --data-raw %s", shellQuote(client.Resolve(spec.Body.Raw, vars)))
+	case model.BodyGraphQL:
+		fmt.Fprintf(&b, " \\\n  --data-raw %s", shellQuote(graphqlPayload(spec.Body, vars)))
 	case model.BodySoap:
 		fmt.Fprintf(&b, " \\\n  --data-raw %s", shellQuote(client.Resolve(spec.Body.Raw, vars)))
 		if spec.Body.SoapVersion != "1.2" {
@@ -322,7 +326,11 @@ func Export(spec model.RequestSpec, vars map[string]string, collectionAuth model
 				continue
 			}
 			if f.Type == "file" {
-				fmt.Fprintf(&b, " \\\n  -F %s", shellQuote(client.Resolve(f.Key, vars)+"=@/path/to/file"))
+				src := client.Resolve(f.Src, vars)
+				if src == "" {
+					continue
+				}
+				fmt.Fprintf(&b, " \\\n  -F %s", shellQuote(client.Resolve(f.Key, vars)+"=@"+src))
 			} else {
 				fmt.Fprintf(&b, " \\\n  -F %s", shellQuote(client.Resolve(f.Key, vars)+"="+client.Resolve(f.Value, vars)))
 			}
@@ -355,15 +363,39 @@ func appendQuery(rawURL string, query []model.KV, vars map[string]string) string
 	return base + "?" + q.Encode()
 }
 
+// graphqlPayload assembles the {"query","variables"} JSON a GraphQL body
+// sends, mirroring buildBody's logic in execute.go (including its
+// pre-split-editor back-compat path) — best-effort for a curl preview, so
+// invalid/empty variables just fall back to null rather than erroring.
+func graphqlPayload(body model.Body, vars map[string]string) string {
+	if body.GraphQLQuery == "" && body.Raw != "" {
+		return client.Resolve(body.Raw, vars)
+	}
+	variables := json.RawMessage("null")
+	if v := strings.TrimSpace(client.Resolve(body.GraphQLVariables, vars)); v != "" && json.Valid([]byte(v)) {
+		variables = json.RawMessage(v)
+	}
+	payload, err := json.Marshal(struct {
+		Query     string          `json:"query"`
+		Variables json.RawMessage `json:"variables"`
+	}{Query: client.Resolve(body.GraphQLQuery, vars), Variables: variables})
+	if err != nil {
+		return ""
+	}
+	return string(payload)
+}
+
 func bodyContentType(body model.Body) string {
 	switch body.Mode {
-	case model.BodyRaw, model.BodyGraphQL:
+	case model.BodyRaw:
 		switch body.RawLanguage {
 		case "json":
 			return "application/json"
 		case "xml":
 			return "application/xml"
 		}
+	case model.BodyGraphQL:
+		return "application/json"
 	case model.BodyURLEncoded:
 		return "application/x-www-form-urlencoded"
 	case model.BodySoap:

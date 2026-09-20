@@ -80,6 +80,7 @@ type pmFormField struct {
 	Key      string `json:"key"`
 	Value    string `json:"value,omitempty"`
 	Type     string `json:"type,omitempty"`
+	Src      string `json:"src,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
 }
 
@@ -226,14 +227,17 @@ func exportBody(b model.Body) *pmBody {
 	case model.BodyFormData:
 		fields := make([]pmFormField, len(b.FormData))
 		for i, f := range b.FormData {
-			fields[i] = pmFormField{Key: f.Key, Value: f.Value, Type: f.Type, Disabled: f.Disabled}
+			fields[i] = pmFormField{Key: f.Key, Value: f.Value, Type: f.Type, Src: f.Src, Disabled: f.Disabled}
 		}
 		return &pmBody{Mode: "formdata", FormData: fields}
 	case model.BodyGraphQL:
-		// hapidays stores a GraphQL body as the already-assembled
-		// {"query":...,"variables":...} JSON POST payload (see
-		// internal/graphqlintro), not split fields — split it back out so
-		// it lands in Postman's native graphql mode instead of raw JSON.
+		if b.GraphQLQuery != "" {
+			return &pmBody{Mode: "graphql", GraphQL: &pmGraphQL{Query: b.GraphQLQuery, Variables: b.GraphQLVariables}}
+		}
+		// Pre-split collections stored the already-assembled
+		// {"query":...,"variables":...} JSON POST payload directly in Raw
+		// (see buildBody's back-compat path) — split it back out so it
+		// still lands in Postman's native graphql mode instead of raw JSON.
 		var parsed struct {
 			Query     string          `json:"query"`
 			Variables json.RawMessage `json:"variables,omitempty"`

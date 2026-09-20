@@ -75,6 +75,28 @@ func (h *rawHeaders) UnmarshalJSON(b []byte) error {
 	return fmt.Errorf("header: unsupported shape %s", string(b))
 }
 
+// rawGraphQLVariables: Postman's own exporter writes this as a pre-
+// serialized JSON string, but some tools emit the variables object
+// directly — accept either so one oddly-shaped field can't fail the whole
+// collection import (this struct is decoded as part of one big
+// json.Unmarshal call, so any field returning an error here is fatal to
+// the entire import, not just this one field).
+type rawGraphQLVariables string
+
+func (v *rawGraphQLVariables) UnmarshalJSON(b []byte) error {
+	var asString string
+	if err := json.Unmarshal(b, &asString); err == nil {
+		*v = rawGraphQLVariables(asString)
+		return nil
+	}
+	var raw json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	*v = rawGraphQLVariables(raw)
+	return nil
+}
+
 type rawKV struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
@@ -172,8 +194,13 @@ type rawBody struct {
 		Key      string `json:"key"`
 		Value    string `json:"value"`
 		Type     string `json:"type"`
+		Src      string `json:"src"`
 		Disabled bool   `json:"disabled"`
 	} `json:"formdata"`
+	GraphQL *struct {
+		Query     string              `json:"query"`
+		Variables rawGraphQLVariables `json:"variables"`
+	} `json:"graphql"`
 	Options struct {
 		Raw struct {
 			Language string `json:"language"`
@@ -338,16 +365,27 @@ func convertBody(b rawBody) model.Body {
 		body.Mode = model.BodyNone
 	}
 	switch body.Mode {
-	case model.BodyRaw, model.BodyGraphQL:
+	case model.BodyRaw:
 		body.Raw = b.Raw
 		body.RawLanguage = b.Options.Raw.Language
+	case model.BodyGraphQL:
+		if b.GraphQL != nil {
+			body.GraphQLQuery = b.GraphQL.Query
+			body.GraphQLVariables = string(b.GraphQL.Variables)
+		} else {
+			// Not Postman's native graphql mode (e.g. a hapidays export
+			// that fell back to raw JSON — see exportBody) — keep it in
+			// Raw so buildBody's back-compat path still sends it correctly.
+			body.Raw = b.Raw
+			body.RawLanguage = b.Options.Raw.Language
+		}
 	case model.BodyURLEncoded:
 		for _, kv := range b.URLEncoded {
 			body.URLEncoded = append(body.URLEncoded, model.KV{Key: kv.Key, Value: kv.Value, Disabled: kv.Disabled})
 		}
 	case model.BodyFormData:
 		for _, f := range b.FormData {
-			body.FormData = append(body.FormData, model.FormField{Key: f.Key, Value: f.Value, Type: f.Type, Disabled: f.Disabled})
+			body.FormData = append(body.FormData, model.FormField{Key: f.Key, Value: f.Value, Type: f.Type, Src: f.Src, Disabled: f.Disabled})
 		}
 	}
 	return body

@@ -13,6 +13,9 @@
       <div class="brand-mark" aria-hidden="true"></div>
       <div class="brand-name">hapidays</div>
       <div class="spacer"></div>
+      <button id="themeToggleBtn" class="icon-btn" title="Toggle light/dark theme" aria-label="Toggle light/dark theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36A5.4 5.4 0 0 1 12 3Z"/></svg>
+      </button>
       <button id="cookiesBtn" class="icon-btn" title="Cookie jar" aria-label="Cookie jar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1"/><circle cx="14" cy="8" r="1"/><circle cx="15" cy="14" r="1"/></svg>
       </button>
@@ -190,6 +193,7 @@
           <option value="xml">XML</option>
           <option value="text">Text</option>
         </select>
+        <button id="bodyPrettify" type="button" class="hidden">Prettify</button>
         <div id="soapFields" class="hidden">
           <div class="field-row">
             <label>SOAP Version</label>
@@ -244,8 +248,15 @@
           <div id="grpcMetadataTable" class="kv-table"></div>
           <button class="add-row" data-target="grpcMetadata">+ Add metadata</button>
         </div>
-        <textarea id="bodyRaw" class="code-area" placeholder="Request body" rows="12"></textarea>
+        <div id="bodyRawWrap" class="code-editor">
+          <pre id="bodyRawHighlight" class="code-editor-highlight hidden" aria-hidden="true"></pre>
+          <textarea id="bodyRaw" class="code-area" placeholder="Request body" rows="12"></textarea>
+        </div>
         <div id="bodyRawHint" class="hint hidden"></div>
+        <div id="graphqlFields" class="hidden">
+          <label>Variables (JSON)</label>
+          <textarea id="graphqlVariables" class="code-area" placeholder="{}" rows="6"></textarea>
+        </div>
         <div id="bodyUrlEncodedTable" class="kv-table hidden"></div>
         <button class="add-row hidden" id="addUrlEncodedRow" data-target="urlencoded">+ Add field</button>
         <div id="bodyFormDataTable" class="kv-table hidden"></div>

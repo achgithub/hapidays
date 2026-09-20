@@ -2,6 +2,36 @@
 // working on networks that block everything but this one binary.
 'use strict';
 
+// ---------- theme ----------
+// Defaults to prefers-color-scheme (see style.css); an explicit choice here
+// overrides it via a data-theme attribute the CSS also checks. Applied
+// immediately at parse time (the script tag is at the end of <body>, so
+// documentElement already exists) rather than waiting for
+// DOMContentLoaded, to avoid a flash of the wrong theme.
+const THEME_KEY = 'hapidays-theme';
+
+function getStoredTheme() {
+  try { return localStorage.getItem(THEME_KEY) || ''; } catch (_) { return ''; }
+}
+
+function effectiveTheme() {
+  const stored = getStoredTheme();
+  if (stored === 'light' || stored === 'dark') return stored;
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+
+function applyTheme(stored) {
+  if (stored === 'light' || stored === 'dark') {
+    document.documentElement.setAttribute('data-theme', stored);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.title = 'Theme: ' + effectiveTheme() + ' (click to switch)';
+}
+
+applyTheme(getStoredTheme());
+
 const state = {
   collections: [],        // summaries
   currentCollection: null, // full object incl. tree
@@ -524,9 +554,15 @@ function renderRequestForm() {
 
   $('#bodyMode').value = currentRequest.body.mode || 'none';
   $('#bodyLanguage').value = currentRequest.body.rawLanguage || 'json';
-  $('#bodyRaw').value = currentRequest.body.mode === 'grpc'
-    ? ((currentRequest.body.grpc && currentRequest.body.grpc.requestJson) || '')
-    : (currentRequest.body.raw || '');
+  if (currentRequest.body.mode === 'grpc') {
+    $('#bodyRaw').value = (currentRequest.body.grpc && currentRequest.body.grpc.requestJson) || '';
+  } else if (currentRequest.body.mode === 'graphql') {
+    const [query, variables] = splitGraphqlBody(currentRequest.body);
+    $('#bodyRaw').value = query;
+    $('#graphqlVariables').value = variables;
+  } else {
+    $('#bodyRaw').value = currentRequest.body.raw || '';
+  }
   $('#soapVersion').value = currentRequest.body.soapVersion || '1.1';
   $('#soapAction').value = currentRequest.body.soapAction || '';
   $('#wsSecurityMode').value = currentRequest.body.wsSecurityMode || '';
@@ -1003,26 +1039,89 @@ async function fetchOAuth2Token(params, grantType) {
   });
 }
 
+// SOAP has its own "Format XML" button (always XML, tied to well-formedness
+// checking); grpc forces JSON but hides the language picker entirely;
+// GraphQL's textarea holds a query, not JSON/XML, so there's nothing here
+// to reformat. This button only applies to plain Raw, where the language
+// picker is live.
+function updatePrettifyVisibility() {
+  const mode = currentRequest.body.mode;
+  const show = mode === 'raw' && $('#bodyLanguage').value !== 'text';
+  $('#bodyPrettify').classList.toggle('hidden', !show);
+}
+
+// Raw (JSON/XML — Text has nothing worth tokenizing) and SOAP (always
+// XML) both hold something worth coloring; GraphQL's textarea holds a
+// query and gRPC's is protojson that's fine plain, so neither applies
+// here. See the CSS comment on .code-editor for why this only touches
+// text/background/caret-color on #bodyRaw rather than switching it to
+// contenteditable.
+function updateBodyRawHighlight() {
+  const pre = $('#bodyRawHighlight');
+  const textarea = $('#bodyRaw');
+  const mode = currentRequest.body.mode;
+  const lang = mode === 'soap' ? 'xml' : $('#bodyLanguage').value;
+  const show = (mode === 'raw' && (lang === 'json' || lang === 'xml')) || mode === 'soap';
+  pre.classList.toggle('hidden', !show);
+  textarea.classList.toggle('code-editor-input-active', show);
+  if (!show) return;
+  try {
+    const html = lang === 'json' ? highlightJson(textarea.value) : highlightXml(textarea.value);
+    // A trailing newline gets no final line box in the <pre>, shorting its
+    // scrollHeight by one line versus the textarea and clamping the scroll
+    // sync below the true bottom — pad it back in.
+    pre.innerHTML = textarea.value.endsWith('\n') ? html + '\n' : html;
+  } catch (_) {
+    pre.textContent = textarea.value; // tokenizer choked on something mid-edit — show it uncolored rather than stale
+  }
+  pre.scrollTop = textarea.scrollTop;
+  pre.scrollLeft = textarea.scrollLeft;
+}
+
+// Collections saved before the split query/variables editor existed stored
+// the already-assembled {"query","variables"} JSON directly in body.raw
+// (see buildBody's back-compat path in execute.go) — split it once here so
+// opening an old request shows it in the new fields instead of empty ones.
+// Returns [query, variablesText].
+function splitGraphqlBody(body) {
+  if (body.graphqlQuery) return [body.graphqlQuery, body.graphqlVariables || ''];
+  if (body.raw) {
+    try {
+      const parsed = JSON.parse(body.raw);
+      if (typeof parsed.query === 'string') {
+        return [parsed.query, parsed.variables !== undefined ? JSON.stringify(parsed.variables, null, 2) : ''];
+      }
+    } catch (_) { /* not the assembled JSON shape — fall through */ }
+    return [body.raw, ''];
+  }
+  return ['', ''];
+}
+
 function renderBodyFields() {
   const mode = currentRequest.body.mode;
-  // graphql is sent exactly like raw (see buildBody in execute.go — same
-  // case, same handling), so it reuses the same textarea + language UI
-  // rather than needing its own. soap also reuses the textarea (it's just
-  // the envelope XML) but swaps the language picker for SOAP-specific
-  // controls (version, SOAPAction, envelope template) since the language
-  // is always XML.
+  // The Query editor reuses the raw-body textarea (like gRPC reuses it for
+  // its protojson editor) since it's the same "one big text box" shape;
+  // Variables gets its own box in #graphqlFields since it's a second field.
+  // soap also reuses the textarea (it's just the envelope XML) but swaps
+  // the language picker for SOAP-specific controls (version, SOAPAction,
+  // envelope template) since the language is always XML.
   const isGrpc = mode === 'grpc';
-  const isRawLike = mode === 'raw' || mode === 'graphql' || mode === 'soap' || isGrpc;
+  const isGraphql = mode === 'graphql';
+  const isRawLike = mode === 'raw' || isGraphql || mode === 'soap' || isGrpc;
   const isSoap = mode === 'soap';
   // The Body-tab dropdown only chooses among the four HTTP body shapes now
   // (none/raw/urlencoded/formdata) — GraphQL/SOAP/gRPC are chosen via the
   // protocol switcher above, so hide the dropdown entirely rather than
   // show a control with nothing left to decide.
-  $('#bodyMode').classList.toggle('hidden', mode === 'graphql' || isSoap || isGrpc);
-  $('#bodyRaw').classList.toggle('hidden', !isRawLike);
-  $('#bodyLanguage').classList.toggle('hidden', !isRawLike || isSoap || isGrpc);
+  $('#bodyMode').classList.toggle('hidden', isGraphql || isSoap || isGrpc);
+  $('#bodyRawWrap').classList.toggle('hidden', !isRawLike);
+  $('#bodyRaw').placeholder = isGraphql ? 'GraphQL query' : 'Request body';
+  $('#bodyLanguage').classList.toggle('hidden', !isRawLike || isSoap || isGrpc || isGraphql);
+  updatePrettifyVisibility();
+  updateBodyRawHighlight();
   $('#soapFields').classList.toggle('hidden', !isSoap);
   $('#grpcFields').classList.toggle('hidden', !isGrpc);
+  $('#graphqlFields').classList.toggle('hidden', !isGraphql);
   $('#httpUrlBar').classList.toggle('hidden', isGrpc);
   $('#grpcUrlBar').classList.toggle('hidden', !isGrpc);
   $('#bodyUrlEncodedTable').classList.toggle('hidden', mode !== 'urlencoded');
@@ -1038,7 +1137,7 @@ function renderBodyFields() {
   if (isSoap) {
     currentRequest.body.rawLanguage = 'xml';
     checkSoapWellFormed();
-  } else if (isGrpc) {
+  } else if (isGrpc || isGraphql) {
     currentRequest.body.rawLanguage = 'json';
     $('#bodyRawHint').classList.add('hidden');
   } else {
@@ -1051,6 +1150,12 @@ function renderBodyFields() {
     $('#grpcPlaintext').checked = !!grpc.plaintext;
     $('#grpcFullMethod').value = grpc.fullMethod || '';
     renderKVTable('grpcMetadataTable', grpc.metadata || (grpc.metadata = []));
+  }
+  if (isGraphql) {
+    // Only variables, not the query — switching the protocol chip onto an
+    // otherwise-blank request should carry over whatever's already typed
+    // in the (shared) query textarea rather than clobber it.
+    $('#graphqlVariables').value = splitGraphqlBody(currentRequest.body)[1];
   }
 }
 
@@ -1089,10 +1194,11 @@ const SOAP_ENVELOPE_TEMPLATES = {
 
 // Form-data rows need a Type (text/file) selector the generic KV table
 // doesn't have, so this is its own renderer rather than reusing
-// renderKVTable. File uploads aren't wired up yet (see the matching
-// comment in execute.go's buildBody — a file field is sent empty); the
-// Type selector still lets you mark a field as "file" so the request
-// shape round-trips correctly even though content upload isn't there yet.
+// renderKVTable. Browsers never expose a real filesystem path from a
+// <input type="file"> picker, and hapidays is a local, loopback-only
+// server (same trust model as the client-cert path fields in Settings) —
+// so a "file" field stores a path the backend reads at send time
+// (execute.go's buildBody), rather than shipping file bytes over the API.
 function renderFormDataTable() {
   const container = $('#bodyFormDataTable');
   const list = currentRequest.body.formData || (currentRequest.body.formData = []);
@@ -1114,11 +1220,17 @@ function renderFormDataTable() {
     typeSel.value = f.type === 'file' ? 'file' : 'text';
     chk.onchange = () => { f.disabled = !chk.checked; };
     keyInput.oninput = () => { f.key = keyInput.value; };
-    valInput.oninput = () => { f.value = valInput.value; };
     const applyTypeState = () => {
       f.type = typeSel.value;
-      valInput.disabled = f.type === 'file';
-      valInput.placeholder = f.type === 'file' ? 'File upload not yet supported — sent empty' : 'Value';
+      if (f.type === 'file') {
+        valInput.value = f.src || '';
+        valInput.placeholder = 'Local file path, e.g. /Users/you/file.pdf';
+        valInput.oninput = () => { f.src = valInput.value; };
+      } else {
+        valInput.value = f.value || '';
+        valInput.placeholder = 'Value';
+        valInput.oninput = () => { f.value = valInput.value; };
+      }
     };
     typeSel.onchange = applyTypeState;
     applyTypeState();
@@ -1142,7 +1254,12 @@ function collectFormIntoRequest() {
   // Protocol/Domain/Port/Path edit — nothing to re-read here.
   currentRequest.body.mode = bodyMode;
   currentRequest.body.rawLanguage = $('#bodyLanguage').value;
-  currentRequest.body.raw = $('#bodyRaw').value;
+  if (bodyMode === 'graphql') {
+    currentRequest.body.graphqlQuery = $('#bodyRaw').value;
+    currentRequest.body.graphqlVariables = $('#graphqlVariables').value;
+  } else {
+    currentRequest.body.raw = $('#bodyRaw').value;
+  }
   currentRequest.body.soapVersion = $('#soapVersion').value;
   currentRequest.body.soapAction = $('#soapAction').value;
   currentRequest.body.wsSecurityMode = $('#wsSecurityMode').value;
@@ -1227,6 +1344,51 @@ function highlightJson(text) {
   return out;
 }
 
+// Colors one XML/SOAP tag (already isolated by highlightXml's tokenizer) —
+// splits it into the angle bracket(s), the element name, and each
+// name="value" attribute pair, escaping each piece itself for the same
+// reason highlightJson does.
+function highlightXmlTag(tag) {
+  const m = tag.match(/^<(\/)?([\w:.-]+)/);
+  if (!m) return escapeHtml(tag);
+  let rest = tag.slice(m[0].length);
+  let selfClose = false;
+  if (/\/>\s*$/.test(rest)) { selfClose = true; rest = rest.slice(0, rest.lastIndexOf('/')); }
+  else { rest = rest.slice(0, -1); } // drop trailing '>'
+  let out = '<span class="tok-punc">&lt;' + (m[1] ? '/' : '') + '</span>'
+    + '<span class="tok-tag">' + escapeHtml(m[2]) + '</span>';
+  const attrRe = /([\w:.-]+)(\s*=\s*)("[^"]*"|'[^']*')/g;
+  let lastIndex = 0, am;
+  while ((am = attrRe.exec(rest)) !== null) {
+    out += escapeHtml(rest.slice(lastIndex, am.index));
+    out += '<span class="tok-attr">' + escapeHtml(am[1]) + '</span>' + escapeHtml(am[2])
+      + '<span class="tok-str">' + escapeHtml(am[3]) + '</span>';
+    lastIndex = attrRe.lastIndex;
+  }
+  out += escapeHtml(rest.slice(lastIndex));
+  out += '<span class="tok-punc">' + (selfClose ? '/&gt;' : '&gt;') + '</span>';
+  return out;
+}
+
+// Same tokenizer shape as formatXml (comments/PIs/CDATA/tags/text), reused
+// here to color instead of re-indent.
+function highlightXml(text) {
+  const tokenRe = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/?[^>]+>|[^<]+/g;
+  let out = '';
+  let m;
+  while ((m = tokenRe.exec(text)) !== null) {
+    const token = m[0];
+    if (token.startsWith('<!--') || token.startsWith('<?')) {
+      out += '<span class="tok-comment">' + escapeHtml(token) + '</span>';
+    } else if (token.startsWith('<')) {
+      out += highlightXmlTag(token);
+    } else {
+      out += escapeHtml(token);
+    }
+  }
+  return out;
+}
+
 function setAssertPill(assertions) {
   const pill = $('#respAssertPill');
   if (!assertions || assertions.length === 0) {
@@ -1266,16 +1428,22 @@ function renderResponse(result) {
 
   let bodyText = result.bodyIsBase64 ? '(binary response, base64)\n' + result.body : result.body;
   let isJson = false;
+  let isXml = false;
   if (!result.bodyIsBase64) {
     try {
       bodyText = JSON.stringify(JSON.parse(result.body), null, 2);
       isJson = true;
     } catch (_) {
-      if (looksLikeXml(result.body, result.headers)) bodyText = formatXml(result.body);
+      if (looksLikeXml(result.body, result.headers)) {
+        bodyText = formatXml(result.body);
+        isXml = true;
+      }
     }
   }
   if (isJson) {
     $('#responseBody').innerHTML = highlightJson(bodyText);
+  } else if (isXml) {
+    $('#responseBody').innerHTML = highlightXml(bodyText);
   } else {
     $('#responseBody').textContent = bodyText;
   }
@@ -2021,7 +2189,8 @@ function openHelpModal() {
     <div id="help-body" class="help-eyebrow">Requests</div>
     <h4>Body modes</h4>
     <dl class="help-dl">
-      <dt>Raw</dt><dd>JSON / XML / text / HTML, syntax-highlighted by the language you pick.</dd>
+      <dt>Raw</dt><dd>JSON / XML / text, syntax-highlighted while editing (JSON/XML only) with a Prettify
+        button to reformat in place.</dd>
       <dt>URL-encoded</dt><dd>A key/value form body, sent as <code>application/x-www-form-urlencoded</code>.</dd>
       <dt>Form-data</dt><dd>Multipart form fields, including file fields.</dd>
       <dt>GraphQL</dt><dd>Query/variables editor, posted as the standard <code>{"query","variables"}</code> JSON body.</dd>
@@ -2630,6 +2799,11 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  $('#themeToggleBtn').onclick = () => {
+    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* ignore — theme just won't persist */ }
+    applyTheme(next);
+  };
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;
   $('#protocolSelect').onchange = composeUrlFromFields;
@@ -2727,6 +2901,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('#authType').onchange = (e) => { currentRequest.auth.type = e.target.value; renderAuthFields(); };
   $('#bodyMode').onchange = (e) => { currentRequest.body.mode = e.target.value; renderBodyFields(); };
+  $('#bodyLanguage').onchange = () => { updatePrettifyVisibility(); updateBodyRawHighlight(); };
+  $('#bodyPrettify').onclick = () => {
+    const lang = $('#bodyLanguage').value;
+    try {
+      if (lang === 'json') {
+        $('#bodyRaw').value = JSON.stringify(JSON.parse($('#bodyRaw').value), null, 2);
+      } else if (lang === 'xml') {
+        $('#bodyRaw').value = formatXml($('#bodyRaw').value);
+      }
+    } catch (_) { /* leave as-is if it doesn't parse */ }
+    updateBodyRawHighlight();
+  };
   $('#soapVersion').onchange = () => {
     // Switching version swaps which template "Insert envelope" offers, but
     // don't clobber a body someone already wrote.
@@ -2738,14 +2924,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if ($('#bodyRaw').value.trim() && !confirm('Replace the current body with a blank SOAP envelope template?')) return;
     $('#bodyRaw').value = SOAP_ENVELOPE_TEMPLATES[$('#soapVersion').value] || SOAP_ENVELOPE_TEMPLATES['1.1'];
     checkSoapWellFormed();
+    updateBodyRawHighlight();
   };
   $('#soapFormatXml').onclick = () => {
     try {
       $('#bodyRaw').value = formatXml($('#bodyRaw').value);
     } catch (_) { /* leave as-is if it doesn't parse */ }
     checkSoapWellFormed();
+    updateBodyRawHighlight();
   };
-  $('#bodyRaw').addEventListener('input', () => { if (currentRequest.body.mode === 'soap') checkSoapWellFormed(); });
+  $('#bodyRaw').addEventListener('input', () => {
+    if (currentRequest.body.mode === 'soap') checkSoapWellFormed();
+    updateBodyRawHighlight();
+  });
+  // Scrolling (arrow keys, page down, mouse wheel) doesn't fire 'input' —
+  // the highlight pre has its own independent scroll position and drifts
+  // out of alignment with the textarea underneath it unless kept in sync.
+  $('#bodyRaw').addEventListener('scroll', () => {
+    $('#bodyRawHighlight').scrollTop = $('#bodyRaw').scrollTop;
+    $('#bodyRawHighlight').scrollLeft = $('#bodyRaw').scrollLeft;
+  });
   $('#modalOverlay').onclick = (e) => { if (e.target === $('#modalOverlay')) closeModal(); };
 
   // ---------- protocol switcher ----------
