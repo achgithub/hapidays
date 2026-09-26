@@ -1404,8 +1404,20 @@ function updateTlsWarnDot() {
   $('#tlsWarnDot').classList.toggle('hidden', state.tlsOverride !== 'skip');
 }
 
+// The most recent Send, kept so it can be saved as test evidence.
+let lastEvidenceSource = null;
+
+function currentRequestName() {
+  try {
+    if (state.currentCollection && state.selectedPath) return getNodeAt(state.selectedPath).name;
+  } catch (_) { /* stale path — fall through to the URL */ }
+  return `${currentRequest.method} ${currentRequest.urlRaw}`;
+}
+
 async function sendRequest() {
   collectFormIntoRequest();
+  lastEvidenceSource = null;
+  $('#saveEvidenceBtn').classList.add('hidden');
   $('#responseStatus').textContent = 'Sending…';
   $('#responseStatus').className = 'response-status';
   $('#respMeta').classList.add('hidden');
@@ -1422,6 +1434,8 @@ async function sendRequest() {
       }),
     });
     renderResponse(result);
+    lastEvidenceSource = { name: currentRequestName(), result };
+    $('#saveEvidenceBtn').classList.remove('hidden');
     if (result.captured && Object.keys(result.captured).length) {
       await loadEnvironments();
     }
@@ -2151,6 +2165,82 @@ function showModal(html) {
 function closeModal() {
   $('#modalOverlay').classList.add('hidden');
   $('#modalContent').classList.remove('modal-wide');
+}
+
+// ---------- test evidence ----------
+
+const EVIDENCE_WHO_KEY = 'hapidays-evidence-who';
+
+function readEvidenceWho() {
+  try { return localStorage.getItem(EVIDENCE_WHO_KEY) || ''; } catch (_) { return ''; }
+}
+
+// Saves one or more executed requests as an evidence pack. items is
+// [{ name, result }] where result is what /api/send returned. Redaction of
+// credentials happens on the server before anything is written.
+function openSaveEvidenceModal(items, { collectionId } = {}) {
+  const n = items.length;
+  const colId = collectionId !== undefined ? collectionId : (state.currentCollection ? state.currentCollection.id : '');
+  showModal(`
+    <h3>Save test evidence</h3>
+    <p class="hint">${n === 1 ? 'Saves this request and its response' : `Saves these ${n} requests and their responses`},
+    with the headers as sent and as received. Credentials are replaced by short fingerprints (the same value always
+    gets the same one) unless you tick the box below.</p>
+    <div class="field-row"><label for="evWho">Saved by</label>
+      <input id="evWho" type="text" style="flex:1" placeholder="Your name" value="${escapeHtml(readEvidenceWho())}"></div>
+    <div class="field-row"><label for="evNotes">Notes</label>
+      <textarea id="evNotes" rows="4" style="flex:1" placeholder="What was tested, and anything a reviewer should know"></textarea></div>
+    <label style="display:block;margin:8px 0"><input type="checkbox" id="evIncludeCreds"> Include credentials
+      &mdash; the file will contain real tokens and passwords</label>
+    <p class="hint hidden" id="evError" style="color:var(--danger)"></p>
+    <div id="evResult"></div>
+    <div class="modal-actions">
+      <button id="evCancel">Cancel</button>
+      <button id="evSave" style="background:var(--accent);color:#fff">Save</button>
+    </div>
+  `);
+  $('#evCancel').onclick = closeModal;
+  $('#evSave').onclick = async () => {
+    const who = $('#evWho').value.trim();
+    const err = $('#evError');
+    err.classList.add('hidden');
+    if (!who) {
+      err.textContent = 'Enter who is saving this.';
+      err.classList.remove('hidden');
+      return;
+    }
+    try { localStorage.setItem(EVIDENCE_WHO_KEY, who); } catch (_) { /* just won't be remembered */ }
+    $('#evSave').disabled = true;
+    try {
+      const out = await api('/evidence', {
+        method: 'POST',
+        body: JSON.stringify({
+          who,
+          notes: $('#evNotes').value,
+          includeCredentials: $('#evIncludeCreds').checked,
+          collectionId: colId,
+          environmentId: state.currentEnvironmentId,
+          items: items.map(i => ({ name: i.name, result: i.result })),
+        }),
+      });
+      const base = `/api/evidence/${out.id}`;
+      $('#evResult').innerHTML = `
+        <p>Saved ${out.items} exchange${out.items === 1 ? '' : 's'}: ${out.passed} passed, ${out.failed} failed.
+        ${out.credentialsRedacted ? 'Credentials redacted.' : '<strong>Credentials included.</strong>'}</p>
+        <p><a href="${base}/report" target="_blank" rel="noopener">Open report</a> &middot;
+        <a href="${base}/text" target="_blank" rel="noopener">Plain text</a> &middot;
+        Download: <a href="${base}/text?download=1">.txt</a>,
+        <a href="${base}/report?download=1">.html</a>,
+        <a href="${base}?download=1">.json</a></p>`;
+      $('#evSave').classList.add('hidden');
+      $('#evCancel').textContent = 'Close';
+    } catch (e) {
+      err.textContent = 'Could not save: ' + e.message;
+      err.classList.remove('hidden');
+      $('#evSave').disabled = false;
+    }
+  };
+  $('#evWho').focus();
 }
 
 // ---------- export ----------
@@ -2927,6 +3017,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(next);
   };
   $('#refreshBtn').onclick = refreshInPlace;
+  $('#saveEvidenceBtn').onclick = () => { if (lastEvidenceSource) openSaveEvidenceModal([lastEvidenceSource]); };
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;
   $('#protocolSelect').onchange = composeUrlFromFields;
