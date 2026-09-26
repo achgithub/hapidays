@@ -3,6 +3,7 @@ package importer
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"hapidays/internal/model"
@@ -126,5 +127,58 @@ func TestImportHandleErrors(t *testing.T) {
 		if r.Method == "HEAD" && len(r.Captures) != 1 {
 			t.Errorf("HEAD New Request should capture the CSRF token, got %+v", r.Captures)
 		}
+	}
+}
+
+// SAP's "Apply Highest Security Standards" collection: XML payloads (a DOCTYPE
+// with an external entity, near-identical integrity variants), a GET with a
+// body, a SOAP call and a blank header name, alongside the usual CSRF fetches.
+func TestImportApplyHighestSecurityStandards(t *testing.T) {
+	data, err := os.ReadFile("../../testdata/postman/ApplyHighestSecurityStandards.postman_collection.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	col, err := ImportCollection(data, func() string { n++; return fmt.Sprint(n) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if col.Auth.Type != model.AuthBasic {
+		t.Errorf("collection auth = %q, want basic", col.Auth.Type)
+	}
+	byName := map[string]*model.RequestSpec{}
+	var walk func(nodes []*model.Node)
+	walk = func(nodes []*model.Node) {
+		for _, node := range nodes {
+			if node.Request != nil {
+				byName[node.Name] = node.Request
+			}
+			walk(node.Children)
+		}
+	}
+	walk(col.Root)
+
+	if r := byName["CSRFProtection"]; r == nil || r.Method != "GET" || r.Body.Raw != "<Test>Data</Test>" {
+		t.Errorf("CSRFProtection should be a GET keeping its body, got %+v", r)
+	}
+	// Bodies must survive byte for byte, CRLFs included: the integrity variants
+	// differ by nothing more than a comment or an attribute's position.
+	if r := byName["DisableDTDs - Use External Entity"]; r == nil || !strings.Contains(r.Body.Raw, "<!ENTITY xxe SYSTEM") || !strings.Contains(r.Body.Raw, "\r\n") {
+		t.Errorf("DTD body not preserved as written: %+v", r)
+	}
+	seen := map[string]bool{}
+	for name, r := range byName {
+		if strings.HasPrefix(name, "DataIntegrity - ") {
+			seen[r.Body.Raw] = true
+		}
+	}
+	if len(seen) != 5 {
+		t.Errorf("DataIntegrity variants: %d distinct bodies, want 5", len(seen))
+	}
+	if r := byName["SplitterWithStopOnException_withError"]; r != nil {
+		t.Errorf("unexpected request from another collection: %+v", r)
+	}
+	if r := byName["DisableDTDs_GetXsrfToken"]; r == nil || len(r.Captures) != 1 || r.Captures[0].IntoVar != "XSRFToken" {
+		t.Errorf("DisableDTDs_GetXsrfToken should capture XSRFToken, got %+v", r)
 	}
 }

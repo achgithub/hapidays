@@ -1,0 +1,1101 @@
+{
+	"info": {
+		"_postman_id": "8ffd5851-29c5-4fc9-a9ef-dad295b70877",
+		"name": "ApplyHighestSecurityStandards",
+		"description": "This collection contains the requests, which are needed to test the integration flow design guidelines for applying highest security standards. More details can be found in [SAP Help portal](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/201fd43d4dab4bce9144ebfd9cdfbb20.html)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "DisableDTDs",
+			"item": [
+				{
+					"name": "DisableDTDs_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));",
+									"postman.setNextRequest(\"DisableDTDs\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-token",
+								"value": "fetch",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/DisableDTDs",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"DisableDTDs"
+							]
+						},
+						"description": "This request fetches an XSRF token, which is used in the following POST request."
+					},
+					"response": []
+				},
+				{
+					"name": "DisableDTDs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"postman.setNextRequest(\"DisableDTDs - Use External Entity\");",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"value": "ApplySecurity-DisableDTDs",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version='1.0' encoding='utf-8'?>\r\n\r\n<Product>\r\n\t<ProductId>SomeProductId</ProductId>\r\n</Product>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/DisableDTDs",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"DisableDTDs"
+							]
+						},
+						"description": "This request triggers the Integration Flow. Its test checks, if the an http code 500 is returned and if the body contains a corresponding error message."
+					},
+					"response": []
+				},
+				{
+					"name": "DisableDTDs - Use External Entity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 500\", function () {",
+									"    pm.response.to.have.status(500);",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"value": "ApplySecurity-DisableDTDs",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version='1.0' encoding='utf-8'?>\r\n<!DOCTYPE foo [\r\n<!ELEMENT foo ANY>\r\n<!ENTITY xxe SYSTEM \"file:///etc/passwd\">\r\n]>\r\n\r\n<Product>\r\n\t<ProductId>&xxe;</ProductId>\r\n</Product>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/DisableDTDs",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"DisableDTDs"
+							]
+						},
+						"description": "This request triggers the Integration Flow. Its test checks, if the an http code 500 is returned and if the body contains a corresponding error message."
+					},
+					"response": []
+				}
+			],
+			"description": "This folder contains the requests for integration flow \"ApplySecurity_DisableDTDs\". It shows how you can disable DTDs, if you parse XML content in a script step. Run the whole folder to execute the complete scenario, not only one request.",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "RemoveSensitiveContent",
+			"item": [
+				{
+					"name": "RemoveSensitiveContent",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Content-Type is present\", function () {",
+									"    pm.response.to.have.header(\"Content-Type\");",
+									"});",
+									"pm.test(\"Accept is present\", function () {",
+									"    pm.response.to.have.header(\"Accept\");",
+									"});",
+									"pm.test(\"Context is present\", function () {",
+									"    pm.response.to.have.header(\"Context\");",
+									"});",
+									"pm.test(\"Authorization is not present\", function () {",
+									"    pm.response.to.not.have.header(\"Authorization\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"value": "ApplySecurity-RemoveSensitiveContent",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/RemoveSensitiveContent",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"RemoveSensitiveContent"
+							]
+						},
+						"description": "This request triggers the Integration Flow. Its test checks, if the sent headers without the authorization header are returned."
+					},
+					"response": []
+				}
+			],
+			"description": "This folder contains the request for integration flow \"ApplySecurity_RemoveSensitiveContent\". It shows how you should remove sensitive content before you log it or forward it to an external system",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "EncodeDynamicParameters",
+			"item": [
+				{
+					"name": "EncodeDynamicParameters_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));",
+									"postman.setNextRequest(\"EncodeDynamicParameters_OffensiveHeader\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-token",
+								"type": "text",
+								"value": "fetch"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/EncodeDynamicParameters",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"EncodeDynamicParameters"
+							]
+						},
+						"description": "This request fetches an XSRF token, which is used in the following POST request."
+					},
+					"response": []
+				},
+				{
+					"name": "EncodeDynamicParameters_OffensiveHeader",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 500\", function () {",
+									"    pm.response.to.have.status(500);",
+									"});",
+									"pm.test(\"Body contains 'An internal server error occured'\", function () {",
+									"    pm.expect(pm.response.text()).to.include(\"An internal server error occured\");",
+									"});",
+									"postman.setNextRequest(\"EncodeDynamicParameters_CorrectHeader\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"type": "text",
+								"value": "{{XSRFToken}}"
+							},
+							{
+								"key": "rating",
+								"value": "5&$expand=Product",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"value": "ApplySecurity-EncodeDynamicParameters",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<Product>\r\n\t<ProductId>HT-1032</ProductId>\r\n</Product>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/EncodeDynamicParameters",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"EncodeDynamicParameters"
+							]
+						},
+						"description": "This request triggers the Integration Flow with an offensive header. Its test checks, if the an http code 500 is returned and if the body contains a corresponding error message."
+					},
+					"response": []
+				},
+				{
+					"name": "EncodeDynamicParameters_CorrectHeader",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Body contains '<ProductId>HT-1000</ProductId>'\", function () {",
+									"    pm.expect(pm.response.text()).to.include(\"<ProductId>HT-1000</ProductId>\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"type": "text",
+								"value": "{{XSRFToken}}"
+							},
+							{
+								"key": "rating",
+								"value": "3",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"value": "ApplySecurity-EncodeDynamicParameters",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<Product>\r\n\t<ProductId>HT-1000</ProductId>\r\n</Product>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/EncodeDynamicParameters",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"EncodeDynamicParameters"
+							]
+						},
+						"description": "This request triggers the Integration Flow with a correct header. Its test checks, if the an http code 200 is returned and if the body contains an entry with \"<ProductId>HT-1000</ProductId>\""
+					},
+					"response": []
+				}
+			],
+			"description": "This folder contains the request for integration flow \"ApplySecurity_EncodeDynamicParameters\". It shows how you can encode untrusted content, which shall be used as a dynamic parameter in an OData call. There are two requests, one showing how an attacker can try to exploit the weakness, and another, which shows the intended usage. Run the whole folder to execute the complete scenario, not only one request.",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "CSRFProtection",
+			"item": [
+				{
+					"name": "CSRFProtection",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"value": "ApplySecurity-UseCSRFProtection",
+								"type": "text"
+							},
+							{
+								"key": "target_host",
+								"value": "{{host}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<Test>Data</Test>"
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/UseCSRFProtection",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"UseCSRFProtection"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "ClientCertificateAuthentication",
+			"item": [
+				{
+					"name": "ClientCertificateAuthentication",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "Context",
+								"type": "text",
+								"value": "ApplySecurity-ClientCertAuthentication"
+							},
+							{
+								"key": "target_host",
+								"type": "text",
+								"value": "{{host}}"
+							},
+							{
+								"key": "keystore_alias",
+								"value": "{{keystore_alias_for_client_cert_auth}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/UseClientCertAuth",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"UseClientCertAuth"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "UploadWSDLsAsResource",
+			"item": [
+				{
+					"name": "UploadWSDLsAsResource",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 202\", function () {",
+									"    pm.response.to.have.status(202);",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "Context",
+								"type": "text",
+								"value": "ApplySecurity-UploadWSDLsAsResource"
+							},
+							{
+								"key": "",
+								"type": "text",
+								"value": "",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<soapenv:Envelope\r\n\txmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \r\n\txmlns:cpiex=\"http://cpi.sap.com/guidelines/examples\">\r\n   <soapenv:Header/>\r\n   <soapenv:Body>\r\n      <cpiex:Person>\r\n         <cpiex:FirstName>John</cpiex:FirstName>\r\n         <cpiex:LastName>Doe</cpiex:LastName>\r\n      </cpiex:Person>\r\n   </soapenv:Body>\r\n</soapenv:Envelope>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/cxf/ApplySecurity/UploadWSDLsAsResource",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"cxf",
+								"ApplySecurity",
+								"UploadWSDLsAsResource"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "MessageLevelSecurity",
+			"item": [
+				{
+					"name": "MessageLevelSecurity_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));",
+									"postman.setNextRequest(\"MessageLevelSecurity\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"type": "text",
+								"value": "application/xml"
+							},
+							{
+								"key": "X-CSRF-token",
+								"type": "text",
+								"value": "fetch"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/MessageLevelSecurity/SignAndEncrypt",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"MessageLevelSecurity",
+								"SignAndEncrypt"
+							]
+						},
+						"description": "This request fetches an XSRF token, which is used in the following POST request."
+					},
+					"response": []
+				},
+				{
+					"name": "MessageLevelSecurity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							},
+							{
+								"key": "Context",
+								"type": "text",
+								"value": "ApplySecurity-ApplyMessageLevelSecurity"
+							},
+							{
+								"key": "target_host",
+								"type": "text",
+								"value": "{{host}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "When you have successfully executed the integration flow, you’ll see this message in the response body",
+							"options": {
+								"raw": {
+									"language": "text"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/MessageLevelSecurity/SignAndEncrypt",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"MessageLevelSecurity",
+								"SignAndEncrypt"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "DataIntegrity",
+			"item": [
+				{
+					"name": "DataIntegrity_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));\r",
+									"postman.setNextRequest(\"DataIntegrity1\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-CSRF-token",
+								"value": "fetch",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/ProtectDataIntegrity",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"ProtectDataIntegrity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DataIntegrity - Original payload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"postman.setNextRequest(\"DataIntegrity2\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRF-token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<wordGame>\r\n<text xmlns:a=\"http://demo.sap.com\" a:language=\"English\" a:category=\"tongue twister\">She sells seashells by the seashore</text>\r\n<rating></rating>\r\n</wordGame>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/ProtectDataIntegrity",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"ProtectDataIntegrity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DataIntegrity - Empty element",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"postman.setNextRequest(\"DataIntegrity2\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRF-token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<wordGame>\r\n<text xmlns:a=\"http://demo.sap.com\" a:language=\"English\" a:category=\"tongue twister\">She sells seashells by the seashore</text>\r\n<rating/>\r\n</wordGame>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/ProtectDataIntegrity",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"ProtectDataIntegrity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DataIntegrity - Order of attributes and namespace",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"postman.setNextRequest(\"DataIntegrity4\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRF-token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<wordGame>\r\n<text a:category=\"tongue twister\" a:language=\"English\" xmlns:a=\"http://demo.sap.com\">She sells seashells by the seashore</text>\r\n<rating></rating>\r\n</wordGame>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/ProtectDataIntegrity",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"ProtectDataIntegrity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DataIntegrity - Comments",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"postman.setNextRequest(\"DataIntegrity2\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRF-token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<wordGame>\r\n<text xmlns:a=\"http://demo.sap.com\" a:language=\"English\" a:category=\"tongue twister\">She sells seashells by the seashore</text>\r\n<rating><!-- first comment --></rating>\r\n</wordGame>\r\n<!-- second comment -->",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/ProtectDataIntegrity",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"ProtectDataIntegrity"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DataIntegrity - Text modified",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRF-token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<wordGame>\r\n<text xmlns:a=\"http://demo.sap.com\" a:language=\"English\" a:category=\"tongue twister\">She sells seashells at the seashore</text>\r\n<rating></rating>\r\n</wordGame>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/ApplySecurity/ProtectDataIntegrity",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"ApplySecurity",
+								"ProtectDataIntegrity"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "username",
+				"value": "{{username}}",
+				"type": "string"
+			},
+			{
+				"key": "password",
+				"value": "{{password}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
