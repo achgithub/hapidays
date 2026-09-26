@@ -57,3 +57,37 @@ func TestRunCapturesFlowToLaterRequests(t *testing.T) {
 		t.Errorf("OnCapture got %v, want csrf=tok-123", saved)
 	}
 }
+
+// Saving a run as evidence needs each step's full exchange, which the runner
+// only keeps when asked (it makes results as big as every response body).
+func TestRunKeepsExchangesOnlyWhenAsked(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Reply", "yes")
+		_, _ = w.Write([]byte("hello " + r.Header.Get("X-Sent")))
+	}))
+	defer srv.Close()
+
+	nodes := []*model.Node{{ID: "1", Name: "a", Request: &model.RequestSpec{
+		Method:  "GET",
+		URLRaw:  srv.URL + "/",
+		Headers: []model.KV{{Key: "X-Sent", Value: "world"}},
+		Auth:    model.Auth{Type: model.AuthNone},
+	}}}
+
+	without := Run(context.Background(), nodes, Options{})
+	if without[0].Exchange != nil {
+		t.Error("exchange present although not asked for")
+	}
+
+	with := Run(context.Background(), nodes, Options{KeepExchanges: true})
+	res, ok := with[0].Exchange.(*client.Result)
+	if !ok || res == nil {
+		t.Fatalf("exchange = %#v, want *client.Result", with[0].Exchange)
+	}
+	if res.Body != "hello world" || res.Headers["X-Reply"][0] != "yes" {
+		t.Errorf("response not kept: body %q headers %v", res.Body, res.Headers)
+	}
+	if res.Request == nil || res.Request.Headers["X-Sent"][0] != "world" {
+		t.Errorf("request as sent not kept: %+v", res.Request)
+	}
+}

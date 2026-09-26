@@ -25,6 +25,10 @@ type Options struct {
 	// captured values are merged into the run's own variables so later
 	// requests see them, matching what stepping through by hand would do.
 	OnCapture func(captured map[string]string)
+	// KeepExchanges attaches each step's full request and response to its
+	// result (RunStepResult.Exchange) so the run can be saved as evidence.
+	// Off by default: it makes results as large as every response body.
+	KeepExchanges bool
 }
 
 // Run executes nodes (a collection's root, or one folder's children) and
@@ -95,6 +99,13 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 						step.AssertionsPassed = false
 						break
 					}
+				}
+			}
+			if opts.KeepExchanges {
+				if err != nil {
+					step.Exchange = &client.Result{Error: err.Error(), ResolvedURL: step.URL}
+				} else {
+					step.Exchange = result
 				}
 			}
 			results = append(results, step)

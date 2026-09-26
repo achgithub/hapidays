@@ -1761,9 +1761,10 @@ function openRunModal(collectionId, folderId, label) {
           environmentId: state.currentEnvironmentId,
           dataRows, delayMs: parseInt($('#runDelay').value, 10) || 0,
           insecureSkipVerify: currentInsecureSkipVerifyOverride(),
+          includeExchanges: true, // so a result can be saved as test evidence
         }),
       });
-      renderRunResults(results);
+      renderRunResults(results, collectionId);
     } catch (e) {
       $('#runResults').textContent = 'Run failed: ' + e.message;
     } finally {
@@ -1848,8 +1849,13 @@ function stepPassed({ error, status, assertions }) {
   return status >= 200 && status < 400;
 }
 
-function renderRunResults(results) {
+function renderRunResults(results, collectionId) {
   const stepOk = (r) => stepPassed(r);
+  // Iteration data gives each pass over the requests its own row; name the
+  // evidence entries so passes stay distinguishable.
+  const multiRow = results.some(r => r.iteration > 0);
+  const evidenceEntry = (r) => ({ name: (multiRow ? `[Row ${r.iteration + 1}] ` : '') + r.name, result: r.exchange });
+  const saveable = results.filter(r => r.exchange);
   const passCount = results.filter(stepOk).length;
   const anyAssertions = results.some(r => r.assertions && r.assertions.length > 0);
   const container = $('#runResults');
@@ -1857,6 +1863,14 @@ function renderRunResults(results) {
   const summary = document.createElement('p');
   summary.textContent = `${passCount}/${results.length} passed (a request with assertions passes when they all pass; otherwise it needs a 2xx/3xx${anyAssertions ? '' : ' and no transport error'})`;
   container.appendChild(summary);
+  if (saveable.length) {
+    const saveAll = document.createElement('button');
+    saveAll.textContent = 'Save all as evidence';
+    saveAll.title = 'Save every request and response from this run as test evidence';
+    saveAll.style.marginBottom = '6px';
+    saveAll.onclick = () => openSaveEvidenceModal(saveable.map(evidenceEntry), { collectionId });
+    container.appendChild(saveAll);
+  }
   const table = document.createElement('div');
   table.className = 'kv-table';
   results.forEach(r => {
@@ -1867,6 +1881,13 @@ function renderRunResults(results) {
       ? ` · assertions ${r.assertions.filter(a => a.passed).length}/${r.assertions.length}`
       : '';
     row.innerHTML = `<span style="flex:1;color:${ok ? 'var(--ok)' : 'var(--danger)'}">${escapeHtml(String(r.iteration))} · ${escapeHtml(r.method)} ${escapeHtml(r.error || String(r.status))} · ${r.durationMs}ms · ${escapeHtml(r.name)}${assertBadge}</span>`;
+    if (r.exchange) {
+      const save = document.createElement('button');
+      save.textContent = 'Save';
+      save.title = 'Save this request and response as test evidence';
+      save.onclick = () => openSaveEvidenceModal([evidenceEntry(r)], { collectionId });
+      row.appendChild(save);
+    }
     table.appendChild(row);
   });
   container.appendChild(table);

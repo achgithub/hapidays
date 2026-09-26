@@ -285,4 +285,9 @@ type RunStepResult struct {
 	// failed — surfaced separately from Assertions so the runner UI can
 	// show a single pass/fail badge per step without re-deriving it.
 	AssertionsPassed bool `json:"assertionsPassed"`
+	// Exchange is the full request/response for this step (a client.Result,
+	// typed any because model can't import client). Only present when the
+	// run was asked to keep exchanges, since it carries every body — it is
+	// what lets a run be saved as test evidence.
+	Exchange any `json:"exchange,omitempty"`
 }

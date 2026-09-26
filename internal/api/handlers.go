@@ -1092,6 +1092,9 @@ type runRequest struct {
 	DataRows           []map[string]string `json:"dataRows,omitempty"`
 	DelayMS            int                 `json:"delayMs,omitempty"`
 	InsecureSkipVerify *bool               `json:"insecureSkipVerify,omitempty"`
+	// IncludeExchanges returns each step's full request and response, so the
+	// run can be saved as test evidence.
+	IncludeExchanges bool `json:"includeExchanges,omitempty"`
 }
 
 func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
@@ -1130,10 +1133,11 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	results := runner.Run(ctx, nodes, runner.Options{
-		Vars:      vars,
-		DataRows:  req.DataRows,
-		DelayMS:   req.DelayMS,
-		OnCapture: func(captured map[string]string) { s.saveCaptured(req.EnvironmentID, captured) },
+		Vars:          vars,
+		DataRows:      req.DataRows,
+		DelayMS:       req.DelayMS,
+		OnCapture:     func(captured map[string]string) { s.saveCaptured(req.EnvironmentID, captured) },
+		KeepExchanges: req.IncludeExchanges,
 		Client: client.Options{
 			Settings:           settings,
 			InsecureSkipVerify: req.InsecureSkipVerify,
