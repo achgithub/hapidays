@@ -60,3 +60,71 @@ func TestImportPartnerDirectoryExampleFlows(t *testing.T) {
 		t.Errorf("PD String ReceiverUrl assertions = %+v, want status equals 201", post)
 	}
 }
+
+// SAP's "Handle Errors" collection: collection-level basic auth, CSRF fetches
+// that store into globals (pm.globals.set) or the environment, and status
+// checks for both success (200) and deliberate failure (500) cases.
+func TestImportHandleErrors(t *testing.T) {
+	data, err := os.ReadFile("../../testdata/postman/HandleErrors.postman_collection.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	col, err := ImportCollection(data, func() string { n++; return fmt.Sprint(n) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if col.Auth.Type != model.AuthBasic {
+		t.Errorf("collection auth = %q, want basic", col.Auth.Type)
+	}
+
+	byName := map[string][]*model.RequestSpec{} // names repeat ("New Request"), so keep every match
+	var walk func(nodes []*model.Node)
+	walk = func(nodes []*model.Node) {
+		for _, node := range nodes {
+			if node.Request != nil {
+				byName[node.Name] = append(byName[node.Name], node.Request)
+			}
+			walk(node.Children)
+		}
+	}
+	walk(col.Root)
+
+	wantStatus := func(name, code string) {
+		t.Helper()
+		for _, r := range byName[name] {
+			if len(r.Assertions) != 1 || r.Assertions[0] != (model.Assertion{Type: model.AssertStatusEquals, Expected: code}) {
+				t.Errorf("%s assertions = %+v, want status equals %s", name, r.Assertions, code)
+			}
+		}
+		if len(byName[name]) == 0 {
+			t.Errorf("request %q not found", name)
+		}
+	}
+	wantStatus("SplitterWithStopOnException_withError", "500")    // a failure case: expects 500
+	wantStatus("SplitterWithStopOnException_withoutError", "200") // and its success twin
+	wantStatus("error on Failure, wrong identifier", "500")
+	wantStatus("HandleErrors_DependentFlows", "200")
+
+	csrf := func(name, header string) {
+		t.Helper()
+		reqs := byName[name]
+		if len(reqs) == 0 {
+			t.Fatalf("request %q not found", name)
+		}
+		want := model.Capture{Source: "header", From: header, IntoVar: "XSRFToken"}
+		for _, r := range reqs {
+			if len(r.Captures) != 1 || r.Captures[0] != want {
+				t.Errorf("%s captures = %+v, want %+v", name, r.Captures, want)
+			}
+		}
+	}
+	csrf("SplitterWithStopOnException_GetXsrfToken", "X-CSRF-Token") // via pm.globals.set
+
+	// Several requests are all named "New Request": only the HEADs fetch the token.
+	for _, r := range byName["New Request"] {
+		if r.Method == "HEAD" && len(r.Captures) != 1 {
+			t.Errorf("HEAD New Request should capture the CSRF token, got %+v", r.Captures)
+		}
+	}
+}

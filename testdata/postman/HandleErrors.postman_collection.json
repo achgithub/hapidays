@@ -1,0 +1,1382 @@
+{
+	"info": {
+		"_postman_id": "ced2af58-3dd9-47c2-8e3a-7c4281476a77",
+		"name": "HandleErrors",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "ExceptionSubprocess",
+			"item": [
+				{
+					"name": "HandleErrors_ExtendWithExceptionSubprocess",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productId",
+								"value": "HT-2001",
+								"type": "text"
+							},
+							{
+								"key": "error",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/ExceptionSubprocess",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"ExceptionSubprocess"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get number of MPL for particular custom status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://{{cpi_designtime_url}}/itspaces/odata/api/v1/MessageProcessingLogs/$count?$filter=CustomStatus eq 'LowPrio'",
+							"protocol": "https",
+							"host": [
+								"{{cpi_designtime_url}}"
+							],
+							"path": [
+								"itspaces",
+								"odata",
+								"api",
+								"v1",
+								"MessageProcessingLogs",
+								"$count"
+							],
+							"query": [
+								{
+									"key": "$filter",
+									"value": "CustomStatus eq 'LowPrio'"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search MPL based on custom status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{password}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{username}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://{{cpi_designtime_url}}/itspaces/odata/api/v1/MessageProcessingLogs?$filter=CustomStatus eq 'LowPrio'&$format=json",
+							"protocol": "https",
+							"host": [
+								"{{cpi_designtime_url}}"
+							],
+							"path": [
+								"itspaces",
+								"odata",
+								"api",
+								"v1",
+								"MessageProcessingLogs"
+							],
+							"query": [
+								{
+									"key": "$filter",
+									"value": "CustomStatus eq 'LowPrio'"
+								},
+								{
+									"key": "$format",
+									"value": "json"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "HandleErrors_ExtendWithExceptionSubprocess - Error End Event",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productId",
+								"type": "text",
+								"value": "HT-2002"
+							},
+							{
+								"key": "error",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/ExceptionSubprocess/ErrorEndEvent",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"ExceptionSubprocess",
+								"ErrorEndEvent"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "HandleErrors_ExtendWithExceptionSubprocess - Escalation",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productId",
+								"type": "text",
+								"value": "HT-2000"
+							},
+							{
+								"key": "error",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/ExceptionSubprocess/EscalationEndEvent",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"ExceptionSubprocess",
+								"EscalationEndEvent"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "ErrorInSucccessfulResponse",
+			"item": [
+				{
+					"name": "HandleErrors_ErrorInSuccessfulResponse",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productId",
+								"value": "HT-2001",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/ErrorInSuccessfulResponse",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"ErrorInSuccessfulResponse"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "SplitterWithExceptionSubprocess",
+			"item": [
+				{
+					"name": "SplitterWithStopOnException_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"type": "text",
+								"value": "fetch"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_with_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_with_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterWithStopOnException_withError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 500\", function () {",
+									"    pm.response.to.have.status(500);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>asd</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_with_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_with_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterWithStopOnException_withoutError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>599.20</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_with_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_with_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterWithoutStopOnException_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"type": "text",
+								"value": "fetch"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_without_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_without_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterWithoutStopOnException_withError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>asd</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_without_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_without_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterWithoutStopOnException_withoutError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>599.20</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_without_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_without_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "SplitterGatherWithExceptionSubprocess",
+			"item": [
+				{
+					"name": "SplitterGatherWithStopOnException_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"type": "text",
+								"value": "fetch"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_Gather_with_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_Gather_with_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterGatherWithStopOnException_withError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 500\", function () {",
+									"    pm.response.to.have.status(500);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Gather_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>asd</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_Gather_with_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_Gather_with_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterGatherWithStopOnException_withoutError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Gather_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>599.20</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_Gather_with_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_Gather_with_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterGatherWithoutStopOnException_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"type": "text",
+								"value": "fetch"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_Gather_without_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_Gather_without_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterGatherWithoutStopOnException_withError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Gather_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>asd</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_Gather_without_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_Gather_without_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SplitterGatherWithoutStopOnException_withoutError",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"name": "Content-Type",
+								"value": "application/xml",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<ns0:PurchaseOrder xmlns:ns0=\"http://demo.sap.com/eip/Splitter_Gather_Error_Handling\" PurchaseOrderNumber=\"99401\" OrderDate=\"2019-05-06\">\r\n<Address Type=\"Shipping\">\r\n<Name>Ellen Adams</Name>\r\n<Street>123 Maple Street</Street>\r\n<City>Mill Valley</City>\r\n<State>CA</State>\r\n<Zip>10999</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<Address Type=\"Billing\">\r\n<Name>Tai Yee</Name>\r\n<Street>8 Oak Avenue</Street>\r\n<City>Old Town</City>\r\n<State>PA</State>\r\n<Zip>95819</Zip>\r\n<Country>USA</Country>\r\n</Address>\r\n<DeliveryNotes>Please leave packages in shed by driveway.</DeliveryNotes>\r\n<Items>\r\n<Item ItemNumber=\"10\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"20\">\r\n<ProductId>HT-1001</ProductId>\r\n<ProductName>Notebook Basic 17</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>1249.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"30\">\r\n<ProductId>HT-1000</ProductId>\r\n<ProductName>Notebook Basic 15</ProductName>\r\n<Category>Notebooks</Category>\r\n<Quantity>1</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>956.00</Price>\r\n</Item>\r\n<Item ItemNumber=\"40\">\r\n<ProductId>HT-1030</ProductId>\r\n<ProductName>Ergo Screen</ProductName>\r\n<Category>Flat screens</Category>\r\n<Quantity>2</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>599.20</Price>\r\n</Item>\r\n<Item ItemNumber=\"50\">\r\n<ProductId>HT-1101</ProductId>\r\n<ProductName>Smart Design</ProductName>\r\n<Category>Software</Category>\r\n<Quantity>10</Quantity>\r\n<CurrencyCode>EUR</CurrencyCode>\r\n<Price>799.00</Price>\r\n</Item>\r\n</Items>\r\n</ns0:PurchaseOrder>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/Splitter_Gather_without_Stop_on_Exception",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"Splitter_Gather_without_Stop_on_Exception"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "DependentFlows",
+			"item": [
+				{
+					"name": "HandleErrors_DependentFlows_GetXsrfToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"XSRFToken\",pm.response.headers.get(\"X-CSRF-Token\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"value": "fetch",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/DependentFlows",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"DependentFlows"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "HandleErrors_DependentFlows",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\"?>\r\n<categories>\r\n<category>Notebooks</category>\r\n<category>Software</category>\r\n<category>Beamers</category>\r\n</categories>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/DependentFlows",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"DependentFlows"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "DependentFlowsSimple",
+			"item": [
+				{
+					"name": "New Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+									"pm.environment.set(\"XSRFToken\", xcsrfValue);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"value": "fetch",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/DependentFlowsSimple",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"DependentFlowsSimple"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "New Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "exception_in_subprocess",
+								"value": "true",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "default"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/DependentFlowsSimple",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"DependentFlowsSimple"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Subprocess",
+			"item": [
+				{
+					"name": "New Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+									"pm.environment.set(\"XSRFToken\", xcsrfValue);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "HEAD",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"value": "fetch",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/LocalIntegrationProcess",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"LocalIntegrationProcess"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "New Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "exception_in_subprocess",
+								"value": "true",
+								"type": "text"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{XSRFToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/LocalIntegrationProcess",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"LocalIntegrationProcess"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "ThrowExceptionOnFailure",
+			"item": [
+				{
+					"name": "no error, correct identifier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productIdentifier",
+								"value": "HT-1000",
+								"type": "text"
+							},
+							{
+								"key": "host",
+								"value": "{{host}}",
+								"type": "text"
+							},
+							{
+								"key": "throwExceptionOnFailure",
+								"value": "false",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/exploreThrowExceptionOnFailure",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"exploreThrowExceptionOnFailure"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "no error, wrong identifier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productIdentifier",
+								"value": "HT-10001",
+								"type": "text"
+							},
+							{
+								"key": "host",
+								"value": "{{host}}",
+								"type": "text"
+							},
+							{
+								"key": "throwExceptionOnFailure",
+								"value": "false",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/exploreThrowExceptionOnFailure",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"exploreThrowExceptionOnFailure"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "no error, missing identifier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "host",
+								"value": "{{host}}",
+								"type": "text"
+							},
+							{
+								"key": "throwExceptionOnFailure",
+								"value": "false",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/exploreThrowExceptionOnFailure",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"exploreThrowExceptionOnFailure"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "error on Failure, wrong identifier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 500\", function () {\r",
+									"    pm.response.to.have.status(500);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "productIdentifier",
+								"value": "HT-10001",
+								"type": "text"
+							},
+							{
+								"key": "host",
+								"value": "{{host}}",
+								"type": "text"
+							},
+							{
+								"key": "throwExceptionOnFailure",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/exploreThrowExceptionOnFailure",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"exploreThrowExceptionOnFailure"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "error on Failure, missing identifier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 500\", function () {\r",
+									"    pm.response.to.have.status(500);\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "host",
+								"value": "{{host}}",
+								"type": "text"
+							},
+							{
+								"key": "throwExceptionOnFailure",
+								"value": "true",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://{{host}}/http/HandleErrors/exploreThrowExceptionOnFailure",
+							"protocol": "https",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"http",
+								"HandleErrors",
+								"exploreThrowExceptionOnFailure"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "password",
+				"value": "{{password}}",
+				"type": "string"
+			},
+			{
+				"key": "username",
+				"value": "{{username}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
