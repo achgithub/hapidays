@@ -1931,6 +1931,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
       $('#stepProgress').textContent = `Done — ${steps.length}/${steps.length} steps executed.`;
       $('#stepNext').disabled = true;
       $('#stepRunToEnd').disabled = true;
+      $('#stepStop').textContent = 'Close'; // nothing left to stop
       return;
     }
     const step = steps[idx];

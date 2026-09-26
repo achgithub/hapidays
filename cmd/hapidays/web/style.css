@@ -88,6 +88,10 @@
 body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
 button, input, select, textarea { font-family: inherit; font-size: 13px; }
 button { cursor: pointer; }
+/* A disabled button has to look inert. Several are styled with an inline
+   background (the primary accent buttons), which hides the browser's own
+   dimming, so a spent "Step" button used to look exactly like a live one. */
+button:disabled { opacity: 0.4; pointer-events: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
 .mono, .code-area, #bodyRaw { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
