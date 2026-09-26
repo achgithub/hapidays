@@ -478,16 +478,25 @@ function loadRequestIntoForm(req) {
 // into that tab once, on load, then dropped from the composed URL.
 const URL_DECOMPOSE_RE = /^(?:(https?):\/\/)?([^/:?#]+)?(?::(\d+))?([^?#]*)(?:\?([^#]*))?/;
 
-// True when the domain is a single {{var}} token — treated as already
-// carrying its own scheme (e.g. {{baseUrl}} = "https://api.example.com"),
-// so Protocol is disabled rather than double-prepended.
+// True when the domain is a single {{var}} token.
 function domainIsVariable(domain) {
   return domain.trim().startsWith('{{');
 }
 
+// Set when the loaded request wrote its scheme out explicitly in front of a
+// variable host ("https://{{host}}/path" — what Postman collections
+// typically look like). In that case the scheme is the user's, so it is kept
+// and Protocol stays editable. A bare "{{baseUrl}}" with no scheme in front
+// is still treated as carrying its own (e.g. baseUrl = "https://api.x.com"),
+// so Protocol is disabled rather than double-prepended.
+let keepSchemeOnVarDomain = false;
+
+function protocolIgnored(domain) {
+  return domainIsVariable(domain) && !keepSchemeOnVarDomain;
+}
+
 function updateProtocolFieldState() {
-  const isVar = domainIsVariable($('#domainInput').value);
-  $('#protocolSelect').disabled = isVar;
+  $('#protocolSelect').disabled = protocolIgnored($('#domainInput').value);
 }
 
 // Rebuilds currentRequest.urlRaw from the four fields (never includes a
@@ -500,7 +509,7 @@ function composeUrlFromFields() {
   const path = $('#pathInput').value;
   updateProtocolFieldState();
 
-  let url = domainIsVariable(domain) ? domain : (domain ? `${$('#protocolSelect').value}://${domain}` : '');
+  let url = protocolIgnored(domain) ? domain : (domain ? `${$('#protocolSelect').value}://${domain}` : '');
   if (port) url += `:${port}`;
   url += path;
   currentRequest.urlRaw = url;
@@ -535,6 +544,7 @@ function loadUrlFieldsFromRequest() {
   }
 
   $('#protocolSelect').value = protocol || 'https';
+  keepSchemeOnVarDomain = !!protocol && (domain || '').trim().startsWith('{{');
   $('#domainInput').value = domain || '';
   $('#portInput').value = port || '';
   $('#pathInput').value = path || '';

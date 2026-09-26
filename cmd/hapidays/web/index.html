@@ -116,7 +116,7 @@
               <option>GET</option><option>POST</option><option>PUT</option>
               <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
             </select>
-            <select id="protocolSelect" title="Disabled when Domain is a {{variable}} — assumed to already include the scheme">
+            <select id="protocolSelect" title="Disabled when Domain is a bare {{variable}} — assumed to already include the scheme. Stays enabled (and is kept) when the URL was written as https://{{variable}}">
               <option value="https">https://</option>
               <option value="http">http://</option>
             </select>
