@@ -1,0 +1,4718 @@
+{
+	"info": {
+		"_postman_id": "0208adf4-2cdd-42ae-b994-0ebddc5b362e",
+		"name": "Partner Directory Example Flows",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Neo Environment",
+			"item": [
+				{
+					"name": "Update Partner Directory (Neo)",
+					"item": [
+						{
+							"name": "PD CSRF Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "5eb0df0d-f974-4b35-8a02-619060a27ada",
+										"exec": [
+											"let xcsrfValue = pm.response.headers.get('X-CSRF-Token')\r",
+											"pm.environment.set(\"cpi_pd_x_csrf_token\", xcsrfValue);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "basic",
+									"basic": [
+										{
+											"key": "password",
+											"value": "{{cpi_password}}",
+											"type": "string"
+										},
+										{
+											"key": "username",
+											"value": "{{cpi_username}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "Fetch"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "*/*"
+									}
+								],
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD AuthorizedUser",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "5d5c2a36-36db-4f55-b647-3e5bf4121e1a",
+										"exec": [
+											"pm.test(\"Status code is 204\", function () {\r",
+											"    pm.response.to.have.status(204);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/AuthorizedUsers('{{cpi_username}}')",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"AuthorizedUsers('{{cpi_username}}')"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Partner",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "96d29609-ef2d-44a9-b996-a03514464fcf",
+										"exec": [
+											"pm.test(\"Status code is 204\", function () {\r",
+											"    pm.response.to.have.status(204);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "",
+										"type": "text",
+										"value": "",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/Partners('{{partner_id}}')",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"Partners('{{partner_id}}')"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String ReceiverUrl",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "34c140c8-eee3-42c5-a3dd-298473b769c3",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"ReceiverUrl\",\r\n  \"Value\": \"https://{{cpi_runtime_url}}/http/PartnerDirectory/GenericReceiverDataStore\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD UserCredentials ReceiverCredentials",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "81cedefc-fef1-40cf-ae59-9bdcffb0426b",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"ReceiverCredentials\",\r\n  \"User\": \"{{cpi_username}}\",\r\n  \"Password\": \"{{cpi_password}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/UserCredentialParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"UserCredentialParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD AuthorizedUser",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "4afb39f1-fb2d-4e04-91fc-07f9abeecfab",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"User\": \"{{cpi_username}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/AuthorizedUsers",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"AuthorizedUsers"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String AS2InboundDecryptMessage",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "2dd8ad5c-4372-4494-89b8-f14ddf4ad3c6",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"AS2_inbound_decrypt_message\",\r\n  \"Value\": \"{{AS2_inbound_decrypt_message}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String ReceiverPrivateKey",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "60b1b8b9-9595-4f3a-b290-667ebd0ed28a",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"ReceiverPrivateKey\",\r\n  \"Value\": \"{{AS2_ReceiverPrivateKey}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String AS2InboundVerifyiSignature",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "c9ab9f35-1a03-488b-bb00-0a2a5ee93d1a",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"AS2_inbound_verify_signature\",\r\n  \"Value\": \"{{AS2_inbound_verify_signature}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Binary SenderPublicKey",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "b1485814-6cf2-49f8-aa2d-723e25d84692",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"SenderPublicKey\",\r\n  \"ContentType\": \"crt\",\r\n  \"Value\": \"{{AS2_SenderPublicKey}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"BinaryParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Alternative PartnerId",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "eb087afd-6692-43df-9068-01df847dacc8",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Agency\": \"Agency\",\r\n  \"Scheme\": \"Scheme\",\r\n  \"Id\": \"Alternative{{partner_id}}\",\r\n  \"Pid\": \"{{partner_id}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"AlternativePartners"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Binary XSLT Mapping",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "20a50e4f-0290-4b94-8f95-d9a3ef818c23",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"MyMapping\",\r\n  \"ContentType\": \"xsl\",\r\n  \"Value\": \"PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHhzbDpzdHlsZXNoZWV0IHhtbG5zOnhzbD0iaHR0cDovL3d3dy53My5vcmcvMTk5OS9YU0wvVHJhbnNmb3JtIgogIHhtbG5zOnhzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSIgZXhjbHVkZS1yZXN1bHQtcHJlZml4ZXM9InhzIiB2ZXJzaW9uPSIyLjAiPgoKICA8eHNsOm91dHB1dCBtZXRob2Q9InhtbCIgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIGluZGVudD0ieWVzIi8+CiAgPHhzbDpzdHJpcC1zcGFjZSBlbGVtZW50cz0iKiIvPgoKICA8eHNsOnRlbXBsYXRlIG1hdGNoPSJAKiB8IG5vZGUoKSI+CiAgICA8eHNsOmFwcGx5LXRlbXBsYXRlcyBzZWxlY3Q9IkAqIHwgbm9kZSgpIi8+CiAgPC94c2w6dGVtcGxhdGU+CgogIDx4c2w6dmFyaWFibGUgbmFtZT0idG1wLWFtb3VudCIgYXM9InhzOmRlY2ltYWwiPjAuMDA8L3hzbDp2YXJpYWJsZT4KCiAgPHhzbDp0ZW1wbGF0ZSBtYXRjaD0iLyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJNYXN0ZXJEYXRhIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IkN1c3RvbWVyTmFtZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9DdXN0b21lclsxXS9OYW1lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lcklkIj4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iL09yZGVyL0N1c3RvbWVyWzFdL0lkWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck1haWwiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vTWFpbFsxXSIvPgogICAgICA8L3hzbDplbGVtZW50PgogICAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJUZWxlcGhvbmUiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vVGVsZXBob25lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lclBhcnRuZXJJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9IZWFkZXJbMV0vUElEWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck9yZGVySGlzdG9yeSI+CiAgICAgICAgPHhzbDpmb3ItZWFjaCBzZWxlY3Q9Ii9PcmRlci9JdGVtcy9JdGVtIj4KICAgICAgICAgIDx4c2w6Y2FsbC10ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyIvPgogICAgICAgIDwveHNsOmZvci1lYWNoPgogICAgICA8L3hzbDplbGVtZW50PgogICAgPC94c2w6ZWxlbWVudD4KICA8L3hzbDp0ZW1wbGF0ZT4KCiAgPHhzbDp0ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iT3JkZXJlZEl0ZW1zIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlByb2R1Y3RJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJvZHVjdElkIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJQcmljZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJpY2UiLz4KICAgICAgPC94c2w6ZWxlbWVudD4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlF1YW50aXR5Ij4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iLi9RdHR5Ii8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICA8L3hzbDplbGVtZW50PgogIDwveHNsOnRlbXBsYXRlPgoKCgo8L3hzbDpzdHlsZXNoZWV0Pgo=\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"BinaryParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Binary XSD MyMapping",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "cac0c99b-6a93-4947-ad79-19323fd160e8",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-CSRF-Token",
+										"type": "text",
+										"value": "{{cpi_pd_x_csrf_token}}"
+									},
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"MyMappingSchema\",\r\n  \"ContentType\": \"xsd\",\r\n  \"Value\": \"PHhzOnNjaGVtYSBhdHRyaWJ1dGVGb3JtRGVmYXVsdD0idW5xdWFsaWZpZWQiIGVsZW1lbnRGb3JtRGVmYXVsdD0icXVhbGlmaWVkIiB4bWxuczp4cz0iaHR0cDovL3d3dy53My5vcmcvMjAwMS9YTUxTY2hlbWEiPgoJPHhzOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJNYXN0ZXJEYXRhIj4KCQk8eHM6Y29tcGxleFR5cGU+CgkJCTx4czpzZXF1ZW5jZT4KCQkJCTx4czplbGVtZW50IHR5cGU9InhzOnN0cmluZyIgbmFtZT0iQ3VzdG9tZXJOYW1lIi8+CgkJCQk8eHM6ZWxlbWVudCB0eXBlPSJ4czppbnQiIG5hbWU9IkN1c3RvbWVySWQiLz4KCQkJCTx4czplbGVtZW50IHR5cGU9InhzOnN0cmluZyIgbmFtZT0iQ3VzdG9tZXJNYWlsIi8+CgkJCQk8eHM6ZWxlbWVudCB0eXBlPSJ4czpzdHJpbmciIG5hbWU9IkN1c3RvbWVyVGVsZXBob25lIi8+CgkJCQk8eHM6ZWxlbWVudCB0eXBlPSJ4czpzdHJpbmciIG5hbWU9IkN1c3RvbWVyUGFydG5lcklkIi8+CgkJCQk8eHM6ZWxlbWVudCBuYW1lPSJDdXN0b21lck9yZGVySGlzdG9yeSI+CgkJCQkJPHhzOmNvbXBsZXhUeXBlPgoJCQkJCQk8eHM6c2VxdWVuY2U+CgkJCQkJCQk8eHM6ZWxlbWVudCBuYW1lPSJPcmRlcmVkSXRlbXMiIG1heE9jY3Vycz0idW5ib3VuZGVkIiBtaW5PY2N1cnM9IjAiPgoJCQkJCQkJCTx4czpjb21wbGV4VHlwZT4KCQkJCQkJCQkJPHhzOnNlcXVlbmNlPgoJCQkJCQkJCQkJPHhzOmVsZW1lbnQgdHlwZT0ieHM6c3RyaW5nIiBuYW1lPSJQcm9kdWN0SWQiLz4KCQkJCQkJCQkJCTx4czplbGVtZW50IHR5cGU9InhzOmZsb2F0IiBuYW1lPSJQcmljZSIvPgoJCQkJCQkJCQkJPHhzOmVsZW1lbnQgdHlwZT0ieHM6Ynl0ZSIgbmFtZT0iUXVhbnRpdHkiLz4KCQkJCQkJCQkJPC94czpzZXF1ZW5jZT4KCQkJCQkJCQk8L3hzOmNvbXBsZXhUeXBlPgoJCQkJCQkJPC94czplbGVtZW50PgoJCQkJCQk8L3hzOnNlcXVlbmNlPgoJCQkJCTwveHM6Y29tcGxleFR5cGU+CgkJCQk8L3hzOmVsZW1lbnQ+CgkJCTwveHM6c2VxdWVuY2U+CgkJPC94czpjb21wbGV4VHlwZT4KCTwveHM6ZWxlbWVudD4KPC94czpzY2hlbWE+\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"BinaryParameters"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"id": "5418b49f-3707-4120-b46c-c0315b8d91c3",
+								"type": "text/javascript",
+								"exec": [
+									""
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"id": "d688d180-14fc-4a7d-83a3-0dff4f3853ff",
+								"type": "text/javascript",
+								"exec": [
+									""
+								]
+							}
+						}
+					],
+					"protocolProfileBehavior": {},
+					"_postman_isSubFolder": true
+				},
+				{
+					"name": "Integration Flows (Neo)",
+					"item": [
+						{
+							"name": "Dynamic Receiver",
+							"item": [
+								{
+									"name": "DynamicReceiverFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "06e2bc5e-934c-4f81-b375-80e6cc23b4f9",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/DynamicReceiver",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"DynamicReceiver"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "DynamicReceiverFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "22b6f3dc-d4dc-45d5-bcdd-a99efdb45cb0",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<Order>\r\n\t<Header>\r\n\t\t<PID>{{partner_id}}</PID>\r\n\t</Header>\r\n\t<Items>\r\n\t\t<item>\r\n\t\t\t<ProductId>Product</ProductId>\r\n\t\t\t<Description>Description</Description>\r\n\t\t\t<Price>10.00</Price>\r\n\t\t\t<Qtty></Qtty>\r\n\t\t</item>\r\n\t</Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/DynamicReceiver",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"DynamicReceiver"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"auth": {
+								"type": "basic",
+								"basic": [
+									{
+										"key": "password",
+										"value": "{{cpi_password}}",
+										"type": "string"
+									},
+									{
+										"key": "username",
+										"value": "{{cpi_username}}",
+										"type": "string"
+									}
+								]
+							},
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "6a1dc2c7-89a1-4596-a8e3-dd4b72175fa6",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "1161064c-6e08-4bda-b22a-21ebadcf05af",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Authorized User",
+							"item": [
+								{
+									"name": "AuthorizedUserFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "ac5174fd-6d10-4077-aa66-8ac3dcd66187",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AuthorizedUser",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AuthorizedUser"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "AuthorizedUserFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "82d8e3b0-f371-410d-afdf-4a9ef6040ec0",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<Order>\r\n\t<Header>\r\n\t</Header>\r\n\t<Items>\r\n\t\t<item>\r\n\t\t\t<ProductId>Product</ProductId>\r\n\t\t\t<Description>Description</Description>\r\n\t\t\t<Price>10.00</Price>\r\n\t\t\t<Qtty></Qtty>\r\n\t\t</item>\r\n\t</Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AuthorizedUser",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AuthorizedUser"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"auth": {
+								"type": "basic",
+								"basic": [
+									{
+										"key": "password",
+										"value": "{{cpi_password}}",
+										"type": "string"
+									},
+									{
+										"key": "username",
+										"value": "{{cpi_username}}",
+										"type": "string"
+									}
+								]
+							},
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "5965e44b-3161-4505-b080-03e73cfdd3ad",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "0b079c58-ef83-4a03-a44a-cc682e6e852d",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "XSLT",
+							"item": [
+								{
+									"name": "XSLTFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "1bf95598-de35-489a-b107-c6ce312fc0f1",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/xsltmapping",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"xsltmapping"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "XSLTFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "0afd5596-9f03-4df9-9c2f-4024da5d3b5b",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\r\n<Order>\r\n  <Header>\r\n    <PID>{{partner_id}}</PID>\r\n  </Header>\r\n  <Customer>\r\n    <Name>Jon Doe AG</Name>\r\n    <Id>1234567890</Id>\r\n    <Mail>jon.doe@sap.com</Mail>\r\n    <Telephone>+40 1234 567890</Telephone>\r\n  </Customer>\r\n  <Items>\r\n    <Item>\r\n      <ProductId>A111</ProductId>\r\n      <Description>Description</Description>\r\n      <Price>5.00</Price>\r\n      <Qtty>1</Qtty>\r\n    </Item>\r\n    <Item>\r\n      <ProductId>B222</ProductId>\r\n      <Description>Description</Description>\r\n      <Price>10.00</Price>\r\n      <Qtty>1</Qtty>\r\n    </Item>\r\n    <Item>\r\n      <ProductId>C333</ProductId>\r\n      <Description>Description</Description>\r\n      <Price>20.00</Price>\r\n      <Qtty>1</Qtty>\r\n    </Item>\r\n  </Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/xsltmapping",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"xsltmapping"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"auth": {
+								"type": "basic",
+								"basic": [
+									{
+										"key": "password",
+										"value": "{{cpi_password}}",
+										"type": "string"
+									},
+									{
+										"key": "username",
+										"value": "{{cpi_username}}",
+										"type": "string"
+									}
+								]
+							},
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "15f81d0c-ce3c-4298-b22e-c4a4b1671fd0",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "a349cec9-e11f-4031-a2e7-a575a8282cab",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Alternative Partner Id",
+							"item": [
+								{
+									"name": "AlternativePartnerIdFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "f41e6d7d-f354-4888-acfc-dcc9155ed449",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AlternativePartnerId",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AlternativePartnerId"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "AlternativePartnerIdFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "74aecef4-36fa-448a-90ef-55f7b90c2706",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<Order>\r\n\t<Header>\r\n\t\t<Agency>Agency</Agency>\r\n\t\t<Scheme>Scheme</Scheme>\r\n\t\t<AlternativePid>Alternative{{partner_id}}</AlternativePid>\r\n\t</Header>\r\n\t<Items>\r\n\t\t<item>\r\n\t\t\t<ProductId>Product</ProductId>\r\n\t\t\t<Description>Description</Description>\r\n\t\t\t<Price>10.00</Price>\r\n\t\t\t<Qtty></Qtty>\r\n\t\t</item>\r\n\t</Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AlternativePartnerId",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AlternativePartnerId"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"auth": {
+								"type": "basic",
+								"basic": [
+									{
+										"key": "password",
+										"value": "{{cpi_password}}",
+										"type": "string"
+									},
+									{
+										"key": "username",
+										"value": "{{cpi_username}}",
+										"type": "string"
+									}
+								]
+							},
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "8cf88d57-3d35-4847-bb56-2399738b1942",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "b82f5905-34f5-49d9-b5c6-e688d43a88b5",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						}
+					],
+					"protocolProfileBehavior": {},
+					"_postman_isSubFolder": true
+				},
+				{
+					"name": "Partner Directory APIs (Neo)",
+					"item": [
+						{
+							"name": "String Parameters",
+							"item": [
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_pd_x_csrf_token}}",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"Pid\": \"Partner-2\",\n    \"Id\": \"ADDRESS\",\n    \"Value\": \"https://b2b.example.com/execute\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_pd_x_csrf_token}}",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": " {\r\n              \r\n                \"Value\": \"https://b2b.example.com/execute2\"\r\n \t\r\n }",
+											"options": {
+												"raw": {}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters(Pid='Partner-2',Id='ADDRESS')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters(Pid='Partner-2',Id='ADDRESS')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_pd_x_csrf_token}}",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters(Pid='Partner-2',Id='ADDRESS')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters(Pid='Partner-2',Id='ADDRESS')"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Binary Parameters",
+							"item": [
+								{
+									"name": "Binary Parameters GET Select",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters?$select=Pid,Id,ContentType",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters"
+											],
+											"query": [
+												{
+													"key": "$select",
+													"value": "Pid,Id,ContentType"
+												}
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters GET Single with content",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters(Pid='Partner-2',Id='MyMapping')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters(Pid='Partner-2',Id='MyMapping')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "{{cpi_pd_x_csrf_token}}"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"Pid\": \"Partner-2\",\r\n  \"Id\": \"MyMapping\",\r\n  \"ContentType\": \"xsl\",\r\n  \"Value\": \"PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHhzbDpzdHlsZXNoZWV0IHhtbG5zOnhzbD0iaHR0cDovL3d3dy53My5vcmcvMTk5OS9YU0wvVHJhbnNmb3JtIgogIHhtbG5zOnhzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSIgZXhjbHVkZS1yZXN1bHQtcHJlZml4ZXM9InhzIiB2ZXJzaW9uPSIyLjAiPgoKICA8eHNsOm91dHB1dCBtZXRob2Q9InhtbCIgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIGluZGVudD0ieWVzIi8+CiAgPHhzbDpzdHJpcC1zcGFjZSBlbGVtZW50cz0iKiIvPgoKICA8eHNsOnRlbXBsYXRlIG1hdGNoPSJAKiB8IG5vZGUoKSI+CiAgICA8eHNsOmFwcGx5LXRlbXBsYXRlcyBzZWxlY3Q9IkAqIHwgbm9kZSgpIi8+CiAgPC94c2w6dGVtcGxhdGU+CgogIDx4c2w6dmFyaWFibGUgbmFtZT0idG1wLWFtb3VudCIgYXM9InhzOmRlY2ltYWwiPjAuMDA8L3hzbDp2YXJpYWJsZT4KCiAgPHhzbDp0ZW1wbGF0ZSBtYXRjaD0iLyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJNYXN0ZXJEYXRhIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IkN1c3RvbWVyTmFtZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9DdXN0b21lclsxXS9OYW1lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lcklkIj4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iL09yZGVyL0N1c3RvbWVyWzFdL0lkWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck1haWwiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vTWFpbFsxXSIvPgogICAgICA8L3hzbDplbGVtZW50PgogICAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJUZWxlcGhvbmUiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vVGVsZXBob25lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lclBhcnRuZXJJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9IZWFkZXJbMV0vUElEWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck9yZGVySGlzdG9yeSI+CiAgICAgICAgPHhzbDpmb3ItZWFjaCBzZWxlY3Q9Ii9PcmRlci9JdGVtcy9JdGVtIj4KICAgICAgICAgIDx4c2w6Y2FsbC10ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyIvPgogICAgICAgIDwveHNsOmZvci1lYWNoPgogICAgICA8L3hzbDplbGVtZW50PgogICAgPC94c2w6ZWxlbWVudD4KICA8L3hzbDp0ZW1wbGF0ZT4KCiAgPHhzbDp0ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iT3JkZXJlZEl0ZW1zIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlByb2R1Y3RJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJvZHVjdElkIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJQcmljZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJpY2UiLz4KICAgICAgPC94c2w6ZWxlbWVudD4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlF1YW50aXR5Ij4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iLi9RdHR5Ii8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICA8L3hzbDplbGVtZW50PgogIDwveHNsOnRlbXBsYXRlPgoKCgo8L3hzbDpzdHlsZXNoZWV0Pgo=\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "{{cpi_pd_x_csrf_token}}"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"ContentType\": \"zip\",\n    \"Value\": \"UEsDBBQAAAAIAJlpEEvRr/FglgEAAGEDAAAMAAAAeHNsX3V0aWwueHNsdZNdS8MwFIavK/gfQhio4BY/blxZJyjqjRfiBwgiI6ZnWzBNwkm6rf/e9Gtb3daL0rTPe97z5qSj21WmyALQSaMTejm4oAS0MKnUs4R+vD/2b+jt+PhotHIqdr5Q4OYAfqO4CorjIxKuUEi7OHAJnXtvY8aWy+VgeT0wOGOXw+GQfb49s3fk2k0NZh3VXMi1ynE7ECZj0rPARDWQcalrwgWkXFVMUwRWQuUp9BFcrnzfIkzlClwQCEnHNVPfqxyWI8+I5hkkNEjnXM+AssBFW9CCo+Q/ChruPkcMG1PcmxQcJQ4UCJ/Q1Ig8A+1PT2waP4EGlOKFow8PcUcS30nNsTg5a42iysVDZhX3rYtvd2ciGvEkzALKDBHZ278DnQL+w0nlEZFR28K4iaRy6Jvpuvtep0X2bMzvh2UP2mPx9VYVLj8kvX0m3+wVBMhFzYRUI7Z2K9Ox7XjVDA5kduAnFo0F9MU66E7OlpiUyzbgYaqK2sF2woezEQfvl0Zy2muPwjnpddy211WVZoY7EcNU63ebH2X8B1BLAQIfABQAAAAIAJlpEEvRr/FglgEAAGEDAAAMACQAAAAAAAAAIAAAAAAAAAB4c2xfdXRpbC54c2wKACAAAAAAAAEAGAAVgvuYgBbTAa11N2KAFtMBrXU3YoAW0wFQSwUGAAAAAAEAAQBeAAAAwAEAAAAA\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters(Pid='Partner-2',Id='MyMapping')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters(Pid='Partner-2',Id='MyMapping')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "{{cpi_pd_x_csrf_token}}"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters(Pid='Partner-2',Id='MyMapping')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters(Pid='Partner-2',Id='MyMapping')"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Alternative Partners",
+							"item": [
+								{
+									"name": "Alternative Partners  GET Single",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partners  GET List",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partner",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "{{cpi_pd_x_csrf_token}}"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"Agency\": \"DUNS\",\n    \"Scheme\": \"NUMBER\",\n    \"Id\": \"123456789\",\n    \"Pid\": \"Partner-2\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partners",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "{{cpi_pd_x_csrf_token}}"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"Pid\": \"GenericPartner2\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partners",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "{{cpi_pd_x_csrf_token}}"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Partners",
+							"item": [
+								{
+									"name": "Partners GET",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/Partners",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"Partners"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Authorized Users",
+							"item": [
+								{
+									"name": "Authorized Users GET",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AuthorizedUsers",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AuthorizedUsers"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "User Credential Parameters",
+							"item": [
+								{
+									"name": "User Credential Parameters GET",
+									"request": {
+										"auth": {
+											"type": "basic",
+											"basic": [
+												{
+													"key": "password",
+													"value": "{{cpi_password}}",
+													"type": "string"
+												},
+												{
+													"key": "username",
+													"value": "{{cpi_username}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/UserCredentialParameters?$filter=Pid eq 'Partner-2'",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"UserCredentialParameters"
+											],
+											"query": [
+												{
+													"key": "$filter",
+													"value": "Pid eq 'Partner-2'"
+												}
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Get CSRF Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "62ab207d-9477-4d42-855f-8f47ab54c5f4",
+										"exec": [
+											"let xcsrfValue = pm.response.headers.get('X-CSRF-Token')",
+											"pm.environment.set(\"cpi_pd_x_csrf_token\", xcsrfValue);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "basic",
+									"basic": [
+										{
+											"key": "password",
+											"value": "{{cpi_password}}",
+											"type": "string"
+										},
+										{
+											"key": "username",
+											"value": "{{cpi_username}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "X-CSRF-Token",
+										"value": "Fetch",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"protocolProfileBehavior": {},
+					"_postman_isSubFolder": true
+				}
+			],
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{cpi_password}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{cpi_username}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "5d479934-3267-4185-856f-7bc31b97fe3b",
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "959ae741-4fb3-4d80-97c0-ca862aae5d0a",
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			],
+			"protocolProfileBehavior": {}
+		},
+		{
+			"name": "CF Environment",
+			"item": [
+				{
+					"name": "Update Partner Directory (CF)",
+					"item": [
+						{
+							"name": "PD Access Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "0b37e203-839f-427c-82f7-724b20cd8e8c",
+										"exec": [
+											"var jsonData = JSON.parse(responseBody);\r",
+											"postman.setEnvironmentVariable(\"cpi_api_token\", jsonData.access_token);\r",
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "basic",
+									"basic": [
+										{
+											"key": "password",
+											"value": "{{cpi_api_clientSecret}}",
+											"type": "string"
+										},
+										{
+											"key": "username",
+											"value": "{{cpi_api_clientId}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "*/*"
+									}
+								],
+								"url": {
+									"raw": "https://{{cpi_token_url}}/oauth/token?grant_type=client_credentials",
+									"protocol": "https",
+									"host": [
+										"{{cpi_token_url}}"
+									],
+									"path": [
+										"oauth",
+										"token"
+									],
+									"query": [
+										{
+											"key": "grant_type",
+											"value": "client_credentials"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD AuthorizedUser",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "00301082-2ad8-448f-bcff-6d154d59bd6a",
+										"exec": [
+											"pm.test(\"Status code is 204\", function () {\r",
+											"    pm.response.to.have.status(204);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "b846f7aa-a3b8-4a6f-8901-d2a6a866d717",
+										"exec": [
+											"var cpi_clientId_urlEncoded = encodeURI(pm.environment.get(\"cpi_clientId\"));",
+											"",
+											"pm.globals.set(\"cpi_clientId_urlEncoded\", cpi_clientId_urlEncoded);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"protocolProfileBehavior": {
+								"disabledSystemHeaders": {
+									"accept": true
+								},
+								"disableUrlEncoding": false
+							},
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json",
+										"disabled": true
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/x-www-form-urlencoded"
+									}
+								],
+								"body": {
+									"mode": "urlencoded",
+									"urlencoded": [],
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/AuthorizedUsers('{{cpi_clientId_urlEncoded}}')",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"AuthorizedUsers('{{cpi_clientId_urlEncoded}}')"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Partner",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "90edd801-6e55-4112-93b9-21d8918f631e",
+										"exec": [
+											"pm.test(\"Status code is 204\", function () {\r",
+											"    pm.response.to.have.status(204);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "",
+										"type": "text",
+										"value": "",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/Partners('{{partner_id}}')",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"Partners('{{partner_id}}')"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String ReceiverUrl",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "cb369b86-5455-438f-bb2a-ed8489a56a20",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"ReceiverUrl\",\r\n  \"Value\": \"https://{{cpi_runtime_url}}/http/PartnerDirectory/GenericReceiverDataStore\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD UserCredentials ReceiverCredentials",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "17e98e32-3459-4daf-b06a-d1100b41c6c0",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"ReceiverCredentials\",\r\n  \"User\": \"{{cpi_clientId}}\",\r\n  \"Password\": \"{{cpi_clientSecret}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/UserCredentialParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"UserCredentialParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD AuthorizedUser",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "c6feedb4-ddec-4259-a97d-7dd304543999",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"User\": \"{{cpi_clientId}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/AuthorizedUsers",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"AuthorizedUsers"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String AS2InboundDecryptMessage",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "534613f9-8b85-44a7-bdbb-d8f07fe733a4",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"AS2_inbound_decrypt_message\",\r\n  \"Value\": \"{{AS2_inbound_decrypt_message}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String ReceiverPrivateKey",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "5c88a797-8b52-43b2-840a-e91b27617c5f",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"ReceiverPrivateKey\",\r\n  \"Value\": \"{{AS2_ReceiverPrivateKey}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD String AS2InboundVerifyiSignature",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "5991b564-acc7-4b8d-b1df-aff92b4119b9",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"AS2_inbound_verify_signature\",\r\n  \"Value\": \"{{AS2_inbound_verify_signature}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"StringParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Binary SenderPublicKey",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "785f0a0f-6133-48c5-b39e-1a85261f77a5",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"SenderPublicKey\",\r\n  \"ContentType\": \"crt\",\r\n  \"Value\": \"{{AS2_SenderPublicKey}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"BinaryParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Alternative PartnerId",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "f06159b4-f42e-4201-9194-48cb07c4b4ce",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Agency\": \"Agency\",\r\n  \"Scheme\": \"Scheme\",\r\n  \"Id\": \"Alternative{{partner_id}}\",\r\n  \"Pid\": \"{{partner_id}}\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"AlternativePartners"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Binary XSLT Mapping",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "42d22649-eaf2-4b16-ad03-65c45efa5b0f",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"MyMapping\",\r\n  \"ContentType\": \"xsl\",\r\n  \"Value\": \"PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHhzbDpzdHlsZXNoZWV0IHhtbG5zOnhzbD0iaHR0cDovL3d3dy53My5vcmcvMTk5OS9YU0wvVHJhbnNmb3JtIgogIHhtbG5zOnhzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSIgZXhjbHVkZS1yZXN1bHQtcHJlZml4ZXM9InhzIiB2ZXJzaW9uPSIyLjAiPgoKICA8eHNsOm91dHB1dCBtZXRob2Q9InhtbCIgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIGluZGVudD0ieWVzIi8+CiAgPHhzbDpzdHJpcC1zcGFjZSBlbGVtZW50cz0iKiIvPgoKICA8eHNsOnRlbXBsYXRlIG1hdGNoPSJAKiB8IG5vZGUoKSI+CiAgICA8eHNsOmFwcGx5LXRlbXBsYXRlcyBzZWxlY3Q9IkAqIHwgbm9kZSgpIi8+CiAgPC94c2w6dGVtcGxhdGU+CgogIDx4c2w6dmFyaWFibGUgbmFtZT0idG1wLWFtb3VudCIgYXM9InhzOmRlY2ltYWwiPjAuMDA8L3hzbDp2YXJpYWJsZT4KCiAgPHhzbDp0ZW1wbGF0ZSBtYXRjaD0iLyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJNYXN0ZXJEYXRhIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IkN1c3RvbWVyTmFtZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9DdXN0b21lclsxXS9OYW1lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lcklkIj4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iL09yZGVyL0N1c3RvbWVyWzFdL0lkWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck1haWwiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vTWFpbFsxXSIvPgogICAgICA8L3hzbDplbGVtZW50PgogICAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJUZWxlcGhvbmUiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vVGVsZXBob25lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lclBhcnRuZXJJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9IZWFkZXJbMV0vUElEWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck9yZGVySGlzdG9yeSI+CiAgICAgICAgPHhzbDpmb3ItZWFjaCBzZWxlY3Q9Ii9PcmRlci9JdGVtcy9JdGVtIj4KICAgICAgICAgIDx4c2w6Y2FsbC10ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyIvPgogICAgICAgIDwveHNsOmZvci1lYWNoPgogICAgICA8L3hzbDplbGVtZW50PgogICAgPC94c2w6ZWxlbWVudD4KICA8L3hzbDp0ZW1wbGF0ZT4KCiAgPHhzbDp0ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iT3JkZXJlZEl0ZW1zIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlByb2R1Y3RJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJvZHVjdElkIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJQcmljZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJpY2UiLz4KICAgICAgPC94c2w6ZWxlbWVudD4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlF1YW50aXR5Ij4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iLi9RdHR5Ii8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICA8L3hzbDplbGVtZW50PgogIDwveHNsOnRlbXBsYXRlPgoKCgo8L3hzbDpzdHlsZXNoZWV0Pgo=\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"BinaryParameters"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "PD Binary XSD MyMapping",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "0c5ce3f8-bab2-4cdb-a0bd-0ce368286fbe",
+										"exec": [
+											"pm.test(\"Status code is 201\", function () {\r",
+											"    pm.response.to.have.status(201);\r",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{cpi_api_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									},
+									{
+										"key": "Content-Type",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Pid\": \"{{partner_id}}\",\r\n  \"Id\": \"MyMappingSchema\",\r\n  \"ContentType\": \"xsd\",\r\n  \"Value\": \"PHhzOnNjaGVtYSBhdHRyaWJ1dGVGb3JtRGVmYXVsdD0idW5xdWFsaWZpZWQiIGVsZW1lbnRGb3JtRGVmYXVsdD0icXVhbGlmaWVkIiB4bWxuczp4cz0iaHR0cDovL3d3dy53My5vcmcvMjAwMS9YTUxTY2hlbWEiPgoJPHhzOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJNYXN0ZXJEYXRhIj4KCQk8eHM6Y29tcGxleFR5cGU+CgkJCTx4czpzZXF1ZW5jZT4KCQkJCTx4czplbGVtZW50IHR5cGU9InhzOnN0cmluZyIgbmFtZT0iQ3VzdG9tZXJOYW1lIi8+CgkJCQk8eHM6ZWxlbWVudCB0eXBlPSJ4czppbnQiIG5hbWU9IkN1c3RvbWVySWQiLz4KCQkJCTx4czplbGVtZW50IHR5cGU9InhzOnN0cmluZyIgbmFtZT0iQ3VzdG9tZXJNYWlsIi8+CgkJCQk8eHM6ZWxlbWVudCB0eXBlPSJ4czpzdHJpbmciIG5hbWU9IkN1c3RvbWVyVGVsZXBob25lIi8+CgkJCQk8eHM6ZWxlbWVudCB0eXBlPSJ4czpzdHJpbmciIG5hbWU9IkN1c3RvbWVyUGFydG5lcklkIi8+CgkJCQk8eHM6ZWxlbWVudCBuYW1lPSJDdXN0b21lck9yZGVySGlzdG9yeSI+CgkJCQkJPHhzOmNvbXBsZXhUeXBlPgoJCQkJCQk8eHM6c2VxdWVuY2U+CgkJCQkJCQk8eHM6ZWxlbWVudCBuYW1lPSJPcmRlcmVkSXRlbXMiIG1heE9jY3Vycz0idW5ib3VuZGVkIiBtaW5PY2N1cnM9IjAiPgoJCQkJCQkJCTx4czpjb21wbGV4VHlwZT4KCQkJCQkJCQkJPHhzOnNlcXVlbmNlPgoJCQkJCQkJCQkJPHhzOmVsZW1lbnQgdHlwZT0ieHM6c3RyaW5nIiBuYW1lPSJQcm9kdWN0SWQiLz4KCQkJCQkJCQkJCTx4czplbGVtZW50IHR5cGU9InhzOmZsb2F0IiBuYW1lPSJQcmljZSIvPgoJCQkJCQkJCQkJPHhzOmVsZW1lbnQgdHlwZT0ieHM6Ynl0ZSIgbmFtZT0iUXVhbnRpdHkiLz4KCQkJCQkJCQkJPC94czpzZXF1ZW5jZT4KCQkJCQkJCQk8L3hzOmNvbXBsZXhUeXBlPgoJCQkJCQkJPC94czplbGVtZW50PgoJCQkJCQk8L3hzOnNlcXVlbmNlPgoJCQkJCTwveHM6Y29tcGxleFR5cGU+CgkJCQk8L3hzOmVsZW1lbnQ+CgkJCTwveHM6c2VxdWVuY2U+CgkJPC94czpjb21wbGV4VHlwZT4KCTwveHM6ZWxlbWVudD4KPC94czpzY2hlbWE+\"\r\n}",
+									"options": {
+										"raw": {}
+									}
+								},
+								"url": {
+									"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+									"protocol": "https",
+									"host": [
+										"{{cpi_designtime_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"BinaryParameters"
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"protocolProfileBehavior": {},
+					"_postman_isSubFolder": true
+				},
+				{
+					"name": "Integration Flows (CF)",
+					"item": [
+						{
+							"name": "Dynamic Receiver",
+							"item": [
+								{
+									"name": "DynamicReceiverFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "6ee1c892-8897-417e-8d7e-67df0f8e4a78",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/DynamicReceiver",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"DynamicReceiver"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "DynamicReceiverFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "f314153f-05cb-4bf7-a6a3-5a63c80f268a",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<Order>\r\n\t<Header>\r\n\t\t<PID>{{partner_id}}</PID>\r\n\t</Header>\r\n\t<Items>\r\n\t\t<item>\r\n\t\t\t<ProductId>Product</ProductId>\r\n\t\t\t<Description>Description</Description>\r\n\t\t\t<Price>10.00</Price>\r\n\t\t\t<Qtty></Qtty>\r\n\t\t</item>\r\n\t</Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/DynamicReceiver",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"DynamicReceiver"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "4387f11c-9ff3-402b-a9ca-7b5f351264c9",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "7cfd057d-b669-4d17-90d5-473ca8dc68fb",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Authorized User",
+							"item": [
+								{
+									"name": "AuthorizedUserFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "3f98f2ef-6389-47e7-b1d7-d28d028fa45e",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AuthorizedUser",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AuthorizedUser"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "AuthorizedUserFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "325f41da-1d32-4048-80f7-b0c62bf0d93f",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<Order>\r\n\t<Header>\r\n\t</Header>\r\n\t<Items>\r\n\t\t<item>\r\n\t\t\t<ProductId>Product</ProductId>\r\n\t\t\t<Description>Description</Description>\r\n\t\t\t<Price>10.00</Price>\r\n\t\t\t<Qtty></Qtty>\r\n\t\t</item>\r\n\t</Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AuthorizedUser",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AuthorizedUser"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "98d6089a-ddd7-4177-b6f5-0b7d25f3ae33",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "5d784dd2-2017-4b73-a1a0-cdd579d4b8a4",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "XSLT",
+							"item": [
+								{
+									"name": "XSLTFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "93071d5b-7cbe-4d10-8bdd-b0db54147d01",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/xsltmapping",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"xsltmapping"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "XSLTFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "eb39b2d0-b929-4e48-a803-451d918254b0",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\r\n<Order>\r\n  <Header>\r\n    <PID>{{partner_id}}</PID>\r\n  </Header>\r\n  <Customer>\r\n    <Name>Jon Doe AG</Name>\r\n    <Id>1234567890</Id>\r\n    <Mail>jon.doe@sap.com</Mail>\r\n    <Telephone>+40 1234 567890</Telephone>\r\n  </Customer>\r\n  <Items>\r\n    <Item>\r\n      <ProductId>A111</ProductId>\r\n      <Description>Description</Description>\r\n      <Price>5.00</Price>\r\n      <Qtty>1</Qtty>\r\n    </Item>\r\n    <Item>\r\n      <ProductId>B222</ProductId>\r\n      <Description>Description</Description>\r\n      <Price>10.00</Price>\r\n      <Qtty>1</Qtty>\r\n    </Item>\r\n    <Item>\r\n      <ProductId>C333</ProductId>\r\n      <Description>Description</Description>\r\n      <Price>20.00</Price>\r\n      <Qtty>1</Qtty>\r\n    </Item>\r\n  </Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/xsltmapping",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"xsltmapping"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "4a1e9f46-7b85-4c52-b38e-1a4c6f92d369",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "a433e20a-0b07-450f-99f0-d055302c6f2c",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Alternative Partner Id",
+							"item": [
+								{
+									"name": "AlternativePartnerIdFlow_GetXsrfToken",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "399ccc16-5308-4384-8b97-89e830b1fae3",
+												"exec": [
+													"let xcsrfValue = pm.response.headers.get(\"x-csrf-token\")\r",
+													"pm.environment.set(\"cpi_x_csrf_token\", xcsrfValue);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "HEAD",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"type": "text",
+												"value": "fetch"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AlternativePartnerId",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AlternativePartnerId"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "AlternativePartnerIdFlow",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"id": "002d5542-9828-43fe-8124-e61e62f31e78",
+												"exec": [
+													"pm.test(\"Status code is 200\", function () {\r",
+													"    pm.response.to.have.status(200);\r",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-CSRF-Token",
+												"value": "{{cpi_x_csrf_token}}",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/xml",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "<Order>\r\n\t<Header>\r\n\t\t<Agency>Agency</Agency>\r\n\t\t<Scheme>Scheme</Scheme>\r\n\t\t<AlternativePid>Alternative{{partner_id}}</AlternativePid>\r\n\t</Header>\r\n\t<Items>\r\n\t\t<item>\r\n\t\t\t<ProductId>Product</ProductId>\r\n\t\t\t<Description>Description</Description>\r\n\t\t\t<Price>10.00</Price>\r\n\t\t\t<Qtty></Qtty>\r\n\t\t</item>\r\n\t</Items>\r\n</Order>",
+											"options": {
+												"raw": {
+													"language": "xml"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_runtime_url}}/http/PartnerDirectory/AlternativePartnerId",
+											"protocol": "https",
+											"host": [
+												"{{cpi_runtime_url}}"
+											],
+											"path": [
+												"http",
+												"PartnerDirectory",
+												"AlternativePartnerId"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"id": "b7fb95c2-0d2c-4d5b-84c7-37ce00743042",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"id": "0d0bd09c-c559-419f-9621-dbadd1a6bb7f",
+										"type": "text/javascript",
+										"exec": [
+											""
+										]
+									}
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						}
+					],
+					"protocolProfileBehavior": {},
+					"_postman_isSubFolder": true
+				},
+				{
+					"name": "Partner Directory APIs (CF)",
+					"item": [
+						{
+							"name": "String Parameters",
+							"item": [
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"Pid\": \"Partner-2\",\n    \"Id\": \"ADDRESS\",\n    \"Value\": \"https://b2b.example.com/execute\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": " {\r\n              \r\n                \"Value\": \"https://b2b.example.com/execute2\"\r\n \t\r\n }",
+											"options": {
+												"raw": {}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters(Pid='Partner-2',Id='ADDRESS')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters(Pid='Partner-2',Id='ADDRESS')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "String Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json",
+												"type": "text"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"value": "application/json",
+												"type": "text"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/StringParameters(Pid='Partner-2',Id='ADDRESS')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"StringParameters(Pid='Partner-2',Id='ADDRESS')"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Binary Parameters",
+							"item": [
+								{
+									"name": "Binary Parameters GET Select",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters?$select=Pid,Id,ContentType",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters"
+											],
+											"query": [
+												{
+													"key": "$select",
+													"value": "Pid,Id,ContentType"
+												}
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters GET Single with content",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters(Pid='Partner-2',Id='MyMapping')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters(Pid='Partner-2',Id='MyMapping')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"Pid\": \"Partner-2\",\r\n  \"Id\": \"MyMapping\",\r\n  \"ContentType\": \"xsl\",\r\n  \"Value\": \"PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHhzbDpzdHlsZXNoZWV0IHhtbG5zOnhzbD0iaHR0cDovL3d3dy53My5vcmcvMTk5OS9YU0wvVHJhbnNmb3JtIgogIHhtbG5zOnhzPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYSIgZXhjbHVkZS1yZXN1bHQtcHJlZml4ZXM9InhzIiB2ZXJzaW9uPSIyLjAiPgoKICA8eHNsOm91dHB1dCBtZXRob2Q9InhtbCIgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIGluZGVudD0ieWVzIi8+CiAgPHhzbDpzdHJpcC1zcGFjZSBlbGVtZW50cz0iKiIvPgoKICA8eHNsOnRlbXBsYXRlIG1hdGNoPSJAKiB8IG5vZGUoKSI+CiAgICA8eHNsOmFwcGx5LXRlbXBsYXRlcyBzZWxlY3Q9IkAqIHwgbm9kZSgpIi8+CiAgPC94c2w6dGVtcGxhdGU+CgogIDx4c2w6dmFyaWFibGUgbmFtZT0idG1wLWFtb3VudCIgYXM9InhzOmRlY2ltYWwiPjAuMDA8L3hzbDp2YXJpYWJsZT4KCiAgPHhzbDp0ZW1wbGF0ZSBtYXRjaD0iLyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJNYXN0ZXJEYXRhIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IkN1c3RvbWVyTmFtZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9DdXN0b21lclsxXS9OYW1lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lcklkIj4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iL09yZGVyL0N1c3RvbWVyWzFdL0lkWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck1haWwiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vTWFpbFsxXSIvPgogICAgICA8L3hzbDplbGVtZW50PgogICAgICA8eHNsOmVsZW1lbnQgbmFtZT0iQ3VzdG9tZXJUZWxlcGhvbmUiPgogICAgICAgIDx4c2w6dmFsdWUtb2Ygc2VsZWN0PSIvT3JkZXIvQ3VzdG9tZXJbMV0vVGVsZXBob25lWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lclBhcnRuZXJJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii9PcmRlci9IZWFkZXJbMV0vUElEWzFdIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJDdXN0b21lck9yZGVySGlzdG9yeSI+CiAgICAgICAgPHhzbDpmb3ItZWFjaCBzZWxlY3Q9Ii9PcmRlci9JdGVtcy9JdGVtIj4KICAgICAgICAgIDx4c2w6Y2FsbC10ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyIvPgogICAgICAgIDwveHNsOmZvci1lYWNoPgogICAgICA8L3hzbDplbGVtZW50PgogICAgPC94c2w6ZWxlbWVudD4KICA8L3hzbDp0ZW1wbGF0ZT4KCiAgPHhzbDp0ZW1wbGF0ZSBuYW1lPSJPUkRFUl9JVEVNUyI+CiAgICA8eHNsOmVsZW1lbnQgbmFtZT0iT3JkZXJlZEl0ZW1zIj4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlByb2R1Y3RJZCI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJvZHVjdElkIi8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICAgIDx4c2w6ZWxlbWVudCBuYW1lPSJQcmljZSI+CiAgICAgICAgPHhzbDp2YWx1ZS1vZiBzZWxlY3Q9Ii4vUHJpY2UiLz4KICAgICAgPC94c2w6ZWxlbWVudD4KICAgICAgPHhzbDplbGVtZW50IG5hbWU9IlF1YW50aXR5Ij4KICAgICAgICA8eHNsOnZhbHVlLW9mIHNlbGVjdD0iLi9RdHR5Ii8+CiAgICAgIDwveHNsOmVsZW1lbnQ+CiAgICA8L3hzbDplbGVtZW50PgogIDwveHNsOnRlbXBsYXRlPgoKCgo8L3hzbDpzdHlsZXNoZWV0Pgo=\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"ContentType\": \"zip\",\n    \"Value\": \"UEsDBBQAAAAIAJlpEEvRr/FglgEAAGEDAAAMAAAAeHNsX3V0aWwueHNsdZNdS8MwFIavK/gfQhio4BY/blxZJyjqjRfiBwgiI6ZnWzBNwkm6rf/e9Gtb3daL0rTPe97z5qSj21WmyALQSaMTejm4oAS0MKnUs4R+vD/2b+jt+PhotHIqdr5Q4OYAfqO4CorjIxKuUEi7OHAJnXtvY8aWy+VgeT0wOGOXw+GQfb49s3fk2k0NZh3VXMi1ynE7ECZj0rPARDWQcalrwgWkXFVMUwRWQuUp9BFcrnzfIkzlClwQCEnHNVPfqxyWI8+I5hkkNEjnXM+AssBFW9CCo+Q/ChruPkcMG1PcmxQcJQ4UCJ/Q1Ig8A+1PT2waP4EGlOKFow8PcUcS30nNsTg5a42iysVDZhX3rYtvd2ciGvEkzALKDBHZ278DnQL+w0nlEZFR28K4iaRy6Jvpuvtep0X2bMzvh2UP2mPx9VYVLj8kvX0m3+wVBMhFzYRUI7Z2K9Ox7XjVDA5kduAnFo0F9MU66E7OlpiUyzbgYaqK2sF2woezEQfvl0Zy2muPwjnpddy211WVZoY7EcNU63ebH2X8B1BLAQIfABQAAAAIAJlpEEvRr/FglgEAAGEDAAAMACQAAAAAAAAAIAAAAAAAAAB4c2xfdXRpbC54c2wKACAAAAAAAAEAGAAVgvuYgBbTAa11N2KAFtMBrXU3YoAW0wFQSwUGAAAAAAEAAQBeAAAAwAEAAAAA\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters(Pid='Partner-2',Id='MyMapping')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters(Pid='Partner-2',Id='MyMapping')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Binary Parameters",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/BinaryParameters(Pid='Partner-2',Id='MyMapping')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"BinaryParameters(Pid='Partner-2',Id='MyMapping')"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Alternative Partners",
+							"item": [
+								{
+									"name": "Alternative Partners  GET Single",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partners  GET List",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partner",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"Agency\": \"DUNS\",\n    \"Scheme\": \"NUMBER\",\n    \"Id\": \"123456789\",\n    \"Pid\": \"Partner-2\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partners",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\r\n  \"Pid\": \"GenericPartner2\"\r\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Alternative Partners",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											},
+											{
+												"key": "Content-Type",
+												"name": "Content-Type",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AlternativePartners(Hexagency='44554E53',Hexscheme='4E554D424552',Hexid='313233343536373839')"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Partners",
+							"item": [
+								{
+									"name": "Partners GET",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/Partners",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"Partners"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Authorized Users",
+							"item": [
+								{
+									"name": "Authorized Users GET",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/AuthorizedUsers",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"AuthorizedUsers"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "User Credential Parameters",
+							"item": [
+								{
+									"name": "User Credential Parameters GET",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{cpi_api_token}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"type": "text",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "https://{{cpi_designtime_url}}/api/v1/UserCredentialParameters?$filter=Pid eq 'Partner-2'",
+											"protocol": "https",
+											"host": [
+												"{{cpi_designtime_url}}"
+											],
+											"path": [
+												"api",
+												"v1",
+												"UserCredentialParameters"
+											],
+											"query": [
+												{
+													"key": "$filter",
+													"value": "Pid eq 'Partner-2'"
+												}
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"protocolProfileBehavior": {},
+							"_postman_isSubFolder": true
+						},
+						{
+							"name": "Get Access Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"id": "5d2d51e9-204a-42b7-a150-eca44e3a1009",
+										"exec": [
+											"let jsonData = pm.response.json();",
+											"pm.environment.set(\"cpi_api_token\", jsonData.access_token);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "basic",
+									"basic": [
+										{
+											"key": "password",
+											"value": "{{cpi_api_password}}",
+											"type": "string"
+										},
+										{
+											"key": "username",
+											"value": "{{cpi_api_username}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"type": "text",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "https://{{cpi_token_url}}?grant_type=client_credentials",
+									"protocol": "https",
+									"host": [
+										"{{cpi_token_url}}"
+									],
+									"query": [
+										{
+											"key": "grant_type",
+											"value": "client_credentials"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					],
+					"protocolProfileBehavior": {},
+					"_postman_isSubFolder": true
+				}
+			],
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{cpi_clientSecret}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{cpi_clientId}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "01a93ee7-1a33-4830-bb97-9718256c0ddc",
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "2a13e976-2ee9-4d72-bdcc-eabb9f59a1ff",
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			],
+			"protocolProfileBehavior": {}
+		}
+	],
+	"protocolProfileBehavior": {}
+}
