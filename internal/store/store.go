@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"sync"
 
@@ -74,6 +75,35 @@ func readJSON[T any](path string) (*T, error) {
 		return nil, err
 	}
 	return &v, nil
+}
+
+// ---- evidence packs ----
+
+var evidenceIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// ValidEvidenceID reports whether id has the shape NewID produces; ids come
+// from URLs and become file names, so anything else is refused.
+func ValidEvidenceID(id string) bool { return evidenceIDRe.MatchString(id) }
+
+func (s *Store) evidencePath(id string) string {
+	return filepath.Join(s.dir, "evidence", id+".json")
+}
+
+func (s *Store) SaveEvidence(p *model.EvidencePack) error {
+	if !ValidEvidenceID(p.ID) {
+		return fmt.Errorf("invalid evidence id")
+	}
+	if err := os.MkdirAll(filepath.Join(s.dir, "evidence"), 0o700); err != nil {
+		return err
+	}
+	return s.writeJSON(s.evidencePath(p.ID), p)
+}
+
+func (s *Store) LoadEvidence(id string) (*model.EvidencePack, error) {
+	if !ValidEvidenceID(id) {
+		return nil, fmt.Errorf("invalid evidence id")
+	}
+	return readJSON[model.EvidencePack](s.evidencePath(id))
 }
 
 // ---- collections ----

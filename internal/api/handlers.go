@@ -20,6 +20,7 @@ import (
 
 	"hapidays/internal/client"
 	"hapidays/internal/curlconv"
+	"hapidays/internal/evidence"
 	"hapidays/internal/graphqlintro"
 	"hapidays/internal/grpcintro"
 	"hapidays/internal/importer"
@@ -71,6 +72,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/environments/{id}", s.originGuard(s.deleteEnvironment))
 
 	s.mux.HandleFunc("POST /api/send", s.originGuard(s.send))
+	s.mux.HandleFunc("POST /api/evidence", s.originGuard(s.createEvidence))
+	s.mux.HandleFunc("GET /api/evidence/{id}", s.originGuard(s.getEvidence))
+	s.mux.HandleFunc("GET /api/evidence/{id}/report", s.originGuard(s.evidenceReport))
+	s.mux.HandleFunc("GET /api/evidence/{id}/text", s.originGuard(s.evidenceText))
 	s.mux.HandleFunc("POST /api/scripts/suggest", s.originGuard(s.suggestFromScript))
 	s.mux.HandleFunc("POST /api/curl/import", s.originGuard(s.curlImport))
 	s.mux.HandleFunc("POST /api/curl/export", s.originGuard(s.curlExport))
@@ -834,6 +839,132 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, 200, result)
+}
+
+// ---- test evidence ----
+
+type evidenceRequest struct {
+	Who                string `json:"who"`
+	Notes              string `json:"notes"`
+	IncludeCredentials bool   `json:"includeCredentials"`
+	CollectionID       string `json:"collectionId"`
+	EnvironmentID      string `json:"environmentId"`
+	Items              []struct {
+		Name   string        `json:"name"`
+		Result client.Result `json:"result"`
+	} `json:"items"`
+}
+
+// createEvidence saves the given executed requests as an evidence pack.
+// Redaction happens here, before anything is written, so a credential never
+// reaches disk unless the caller explicitly asked for that.
+func (s *Server) createEvidence(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
+	var req evidenceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if len(req.Items) == 0 {
+		writeErr(w, 400, fmt.Errorf("nothing to save: no requests were given"))
+		return
+	}
+	who := strings.TrimSpace(req.Who)
+	if who == "" {
+		who = "(not given)"
+	}
+	params := evidence.BuildParams{
+		ID:                 store.NewID(),
+		Who:                who,
+		Notes:              req.Notes,
+		IncludeCredentials: req.IncludeCredentials,
+		Vars:               s.resolveVars(req.CollectionID, req.EnvironmentID),
+		Now:                time.Now(),
+	}
+	if req.CollectionID != "" {
+		if col, err := s.store.LoadCollection(req.CollectionID); err == nil {
+			params.CollectionName = col.Name
+		}
+	}
+	if req.EnvironmentID != "" {
+		if env, err := s.store.LoadEnvironment(req.EnvironmentID); err == nil {
+			params.EnvironmentName = env.Name
+		}
+	}
+	for _, it := range req.Items {
+		params.Items = append(params.Items, evidence.Input{Name: it.Name, Result: it.Result})
+	}
+	pack := evidence.Build(params)
+	if err := s.store.SaveEvidence(pack); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	passed := 0
+	for _, it := range pack.Items {
+		if it.Passed {
+			passed++
+		}
+	}
+	writeJSON(w, 200, map[string]any{
+		"id": pack.ID, "items": len(pack.Items), "passed": passed, "failed": len(pack.Items) - passed,
+		"credentialsRedacted": pack.CredentialsRedacted,
+	})
+}
+
+func (s *Server) loadEvidenceOr404(w http.ResponseWriter, r *http.Request) *model.EvidencePack {
+	pack, err := s.store.LoadEvidence(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 404, fmt.Errorf("evidence pack not found"))
+		return nil
+	}
+	return pack
+}
+
+// setDownload adds an attachment disposition when ?download=1 is given.
+func setDownload(w http.ResponseWriter, r *http.Request, pack *model.EvidencePack, ext string) {
+	if r.URL.Query().Get("download") == "" {
+		return
+	}
+	name := "evidence-" + pack.SavedAt.UTC().Format("20060102-150405") + "-" + pack.ID[:6] + "." + ext
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+}
+
+func (s *Server) getEvidence(w http.ResponseWriter, r *http.Request) {
+	pack := s.loadEvidenceOr404(w, r)
+	if pack == nil {
+		return
+	}
+	setDownload(w, r, pack, "json")
+	writeJSON(w, 200, pack)
+}
+
+func (s *Server) evidenceText(w http.ResponseWriter, r *http.Request) {
+	pack := s.loadEvidenceOr404(w, r)
+	if pack == nil {
+		return
+	}
+	setDownload(w, r, pack, "txt")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write(evidence.RenderText(pack))
+}
+
+func (s *Server) evidenceReport(w http.ResponseWriter, r *http.Request) {
+	pack := s.loadEvidenceOr404(w, r)
+	if pack == nil {
+		return
+	}
+	body, err := evidence.RenderHTML(pack)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	setDownload(w, r, pack, "html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// The report contains arbitrary response bodies; it needs no scripts or
+	// outside resources, so forbid them outright as a second line of defence
+	// behind the template's escaping.
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	_, _ = w.Write(body)
 }
 
 // suggestFromScript returns the Captures and Assertions recognised in a

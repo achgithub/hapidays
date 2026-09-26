@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/beevik/etree"
@@ -50,6 +51,69 @@ type Result struct {
 	// without re-implementing Resolve's dynamic-variable handling.
 	ResolvedURL string                  `json:"resolvedUrl,omitempty"`
 	Assertions  []model.AssertionResult `json:"assertions,omitempty"`
+	// Request is the request as it actually went out (headers after auth and
+	// the cookie jar were applied), and StartedAt when it was sent. Both
+	// exist so a result can be saved as test evidence.
+	Request   *model.SentRequest `json:"request,omitempty"`
+	StartedAt time.Time          `json:"startedAt"`
+}
+
+// maxRecordedBody caps how much of a request body is kept in Result.Request.
+const maxRecordedBody = 1 << 20
+
+// recordingTransport wraps the real transport and remembers the last request
+// handed to it. That is the one point where everything has been applied:
+// http.Client adds the cookie jar's cookies to the request just before the
+// transport sees it, so reading spec headers (or req.Header ahead of Do)
+// would miss the session Cookie. "Last" is deliberate — after a redirect or
+// a digest-auth retry, the request worth showing is the one that got the
+// final answer.
+type recordingTransport struct {
+	base http.RoundTripper
+	mu   sync.Mutex
+	last *model.SentRequest
+}
+
+func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	sent := &model.SentRequest{
+		Method:  req.Method,
+		URL:     req.URL.String(),
+		Headers: req.Header.Clone(),
+	}
+	if sent.Headers == nil {
+		sent.Headers = map[string][]string{}
+	}
+	host := req.Host
+	if host == "" {
+		host = req.URL.Host
+	}
+	sent.Headers["Host"] = []string{host}
+	if req.GetBody != nil {
+		if rc, err := req.GetBody(); err == nil {
+			b, _ := io.ReadAll(io.LimitReader(rc, maxRecordedBody+1))
+			rc.Close()
+			if len(b) > maxRecordedBody {
+				b = b[:maxRecordedBody]
+				sent.BodyTruncated = true
+			}
+			if isPrintable(b) {
+				sent.Body = string(b)
+			} else {
+				sent.Body = base64.StdEncoding.EncodeToString(b)
+				sent.BodyIsBase64 = true
+			}
+		}
+	}
+	t.mu.Lock()
+	t.last = sent
+	t.mu.Unlock()
+	return t.base.RoundTrip(req)
+}
+
+func (t *recordingTransport) snapshot() *model.SentRequest {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.last
 }
 
 var varPattern = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -259,6 +323,8 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	if err != nil {
 		return nil, err
 	}
+	rec := &recordingTransport{base: httpClient.Transport}
+	httpClient.Transport = rec
 
 	var jar *recordingJar
 	if opts.Cookies != nil {
@@ -272,7 +338,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	start := time.Now()
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL}, nil
+		return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL, Request: rec.snapshot(), StartedAt: start}, nil
 	}
 
 	if spec.Auth.Type == model.AuthDigest && resp.StatusCode == http.StatusUnauthorized {
@@ -282,7 +348,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 		if derr == nil && applyDigestAuth(digestReq, challenge, spec.Auth.Params, vars, bodyBytes) {
 			resp, err = httpClient.Do(digestReq)
 			if err != nil {
-				return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL}, nil
+				return &Result{Error: err.Error(), DurationMS: time.Since(start).Milliseconds(), ResolvedURL: rawURL, Request: rec.snapshot(), StartedAt: start}, nil
 			}
 		}
 	}
@@ -297,7 +363,7 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 	respBody, readErr := io.ReadAll(resp.Body)
 	duration := time.Since(start).Milliseconds()
 	if readErr != nil {
-		return &Result{Error: readErr.Error(), Status: resp.StatusCode, DurationMS: duration, ResolvedURL: rawURL}, nil
+		return &Result{Error: readErr.Error(), Status: resp.StatusCode, DurationMS: duration, ResolvedURL: rawURL, Request: rec.snapshot(), StartedAt: start}, nil
 	}
 
 	result := &Result{
@@ -307,6 +373,8 @@ func Execute(ctx context.Context, spec model.RequestSpec, vars map[string]string
 		DurationMS:  duration,
 		SizeBytes:   int64(len(respBody)),
 		ResolvedURL: rawURL,
+		Request:     rec.snapshot(),
+		StartedAt:   start,
 	}
 	if isPrintable(respBody) {
 		result.Body = string(respBody)
