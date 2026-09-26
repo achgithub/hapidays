@@ -307,6 +307,68 @@ async function openCollectionSettingsModal(collectionId) {
   };
 }
 
+// Finds the index path to the node with this id, or null.
+function findPathById(nodes, id, path = []) {
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.id === id) return path.concat(i);
+    if (n.children) {
+      const p = findPathById(n.children, id, path.concat(i));
+      if (p) return p;
+    }
+  }
+  return null;
+}
+
+// Re-reads collections, the open collection, environments and history from
+// the server WITHOUT reloading the page, so nothing you're in the middle of
+// is lost: the selected environment, the open collection, expanded folders
+// and the selected request all stay put, and unsaved edits in the editor are
+// left alone. Exists because a browser refresh throws all of that away, and
+// data changes on disk (an import via the API, another window, a captured
+// token written into an environment) otherwise can't be seen without one.
+async function refreshInPlace() {
+  const btn = $('#refreshBtn');
+  btn.disabled = true;
+  try {
+    let selectedId = null;
+    if (state.currentCollection && state.selectedPath) {
+      try { selectedId = getNodeAt(state.selectedPath).id; } catch (_) { /* stale path — treat as nothing selected */ }
+    }
+    const editorDirty = lastSavedSnapshot !== null && JSON.stringify(currentRequest) !== lastSavedSnapshot;
+
+    state.collections = (await api('/collections')) || [];
+    if (state.currentCollection) {
+      try {
+        state.currentCollection = await api(`/collections/${state.currentCollection.id}`);
+      } catch (_) {
+        state.currentCollection = null; // deleted since it was opened
+      }
+    }
+    state.selectedPath = (state.currentCollection && selectedId)
+      ? findPathById(state.currentCollection.root, selectedId)
+      : null;
+
+    renderCollectionList();
+    await loadEnvironments();
+    await loadHistory();
+    updateCrumb();
+
+    // Show the request's latest saved state, unless there are unsaved edits —
+    // those are the user's and win over whatever is on disk.
+    if (state.selectedPath && !editorDirty) {
+      const node = getNodeAt(state.selectedPath);
+      if (node && node.request) loadRequestIntoForm(node.request);
+    }
+    btn.style.color = 'var(--ok)';
+    setTimeout(() => { btn.style.color = ''; }, 1200);
+  } catch (e) {
+    alert('Refresh failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function openCollection(id) {
   state.currentCollection = await api(`/collections/${id}`);
   state.selectedPath = null;
@@ -2806,6 +2868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* ignore — theme just won't persist */ }
     applyTheme(next);
   };
+  $('#refreshBtn').onclick = refreshInPlace;
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;
   $('#protocolSelect').onchange = composeUrlFromFields;
