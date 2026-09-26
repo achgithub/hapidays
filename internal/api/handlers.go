@@ -817,24 +817,7 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(result.Captured) > 0 && req.EnvironmentID != "" {
-		if env, err := s.store.LoadEnvironment(req.EnvironmentID); err == nil {
-			for k, v := range result.Captured {
-				updated := false
-				for i, kv := range env.Values {
-					if kv.Key == k {
-						env.Values[i].Value = v
-						updated = true
-						break
-					}
-				}
-				if !updated {
-					env.Values = append(env.Values, model.KV{Key: k, Value: v})
-				}
-			}
-			_ = s.store.SaveEnvironment(env)
-		}
-	}
+	s.saveCaptured(req.EnvironmentID, result.Captured)
 
 	_ = s.store.AppendHistory(model.HistoryEntry{
 		ID:            store.NewID(),
@@ -1008,6 +991,7 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 		Vars:     vars,
 		DataRows: req.DataRows,
 		DelayMS:  req.DelayMS,
+		OnCapture: func(captured map[string]string) { s.saveCaptured(req.EnvironmentID, captured) },
 		Client: client.Options{
 			Settings:           settings,
 			InsecureSkipVerify: req.InsecureSkipVerify,
@@ -1017,6 +1001,33 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	writeJSON(w, 200, results)
+}
+
+// saveCaptured writes captured values into the environment (updating
+// existing keys, appending new ones). No environment selected = nowhere to
+// save, so it's a no-op.
+func (s *Server) saveCaptured(environmentID string, captured map[string]string) {
+	if len(captured) == 0 || environmentID == "" {
+		return
+	}
+	env, err := s.store.LoadEnvironment(environmentID)
+	if err != nil {
+		return
+	}
+	for k, v := range captured {
+		updated := false
+		for i, kv := range env.Values {
+			if kv.Key == k {
+				env.Values[i].Value = v
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			env.Values = append(env.Values, model.KV{Key: k, Value: v})
+		}
+	}
+	_ = s.store.SaveEnvironment(env)
 }
 
 // ---- OData $batch ----

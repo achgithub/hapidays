@@ -19,6 +19,12 @@ type Options struct {
 	DataRows []map[string]string // one run through all requests per row; nil/empty = single run with just Vars
 	DelayMS  int
 	Client   client.Options
+	// OnCapture, if set, is called after each request that captured values
+	// (see model.Capture), so the caller can persist them — e.g. into the
+	// selected environment, as a manual Send does. Independently of this,
+	// captured values are merged into the run's own variables so later
+	// requests see them, matching what stepping through by hand would do.
+	OnCapture func(captured map[string]string)
 }
 
 // Run executes nodes (a collection's root, or one folder's children) and
@@ -35,14 +41,20 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 	}
 
 	var results []model.RunStepResult
+	// Captured values accumulate across requests and iterations; a data row
+	// still takes precedence over them, as it does over the base vars.
+	captured := map[string]string{}
 	for i := 0; i < iterations; i++ {
-		vars := mergeVars(opts.Vars, rowAt(opts.DataRows, i))
 		for _, node := range requests {
 			select {
 			case <-ctx.Done():
 				return results
 			default:
 			}
+
+			// Rebuilt per request so a value captured by an earlier request
+			// (a CSRF token, say) is visible to this one.
+			vars := mergeVars(mergeVars(opts.Vars, captured), rowAt(opts.DataRows, i))
 
 			step := model.RunStepResult{
 				Iteration: i,
@@ -70,6 +82,14 @@ func Run(ctx context.Context, nodes []*model.Node, opts Options) []model.RunStep
 				step.DurationMS = result.DurationMS
 				step.SizeBytes = result.SizeBytes
 				step.Assertions = result.Assertions
+				if len(result.Captured) > 0 {
+					for k, v := range result.Captured {
+						captured[k] = v
+					}
+					if opts.OnCapture != nil {
+						opts.OnCapture(result.Captured)
+					}
+				}
 				for _, a := range result.Assertions {
 					if !a.Passed {
 						step.AssertionsPassed = false
