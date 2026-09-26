@@ -88,6 +88,12 @@ func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error
 		host = req.URL.Host
 	}
 	sent.Headers["Host"] = []string{host}
+	// Go's transport writes Content-Length from ContentLength when it sends,
+	// after this point, so it is never in req.Header; add it so the record
+	// matches what went on the wire.
+	if _, has := sent.Headers["Content-Length"]; !has && req.ContentLength > 0 {
+		sent.Headers["Content-Length"] = []string{strconv.FormatInt(req.ContentLength, 10)}
+	}
 	if req.GetBody != nil {
 		if rc, err := req.GetBody(); err == nil {
 			b, _ := io.ReadAll(io.LimitReader(rc, maxRecordedBody+1))

@@ -54,6 +54,7 @@ type packView struct {
 	Collection  string
 	Environment string
 	Credentials string
+	HeaderNote  string
 	Notes       string
 	Total       int
 	Passed      int
@@ -68,6 +69,7 @@ func viewOf(p *model.EvidencePack) packView {
 		Collection:  p.CollectionName,
 		Environment: p.EnvironmentName,
 		Total:       len(p.Items),
+		HeaderNote:  "request headers are those hapidays set plus Host, Cookie and Content-Length; the HTTP library also adds User-Agent and Accept-Encoding when it sends",
 		Credentials: "redacted (each replaced by a short fingerprint; equal values give equal fingerprints)",
 	}
 	if !p.CredentialsRedacted {
@@ -174,6 +176,7 @@ func RenderText(p *model.EvidencePack) []byte {
 		b.WriteString("Collection:  " + v.Collection + "\n")
 	}
 	b.WriteString("Credentials: " + v.Credentials + "\n")
+	b.WriteString("Headers:     " + v.HeaderNote + "\n")
 	b.WriteString("Result:      " + strconv.Itoa(v.Total) + " exchange(s): " + strconv.Itoa(v.Passed) + " passed, " + strconv.Itoa(v.Failed) + " failed\n")
 	if v.Notes != "" {
 		b.WriteString("\nNotes\n" + sub + "\n" + v.Notes + "\n")
@@ -264,6 +267,7 @@ h1,h2,h3{margin:.8em 0 .3em} table td{padding:0 1em 0 0;vertical-align:top}
 {{if .Environment}}<tr><td>Environment</td><td>{{.Environment}}</td></tr>{{end}}
 {{if .Collection}}<tr><td>Collection</td><td>{{.Collection}}</td></tr>{{end}}
 <tr><td>Credentials</td><td>{{.Credentials}}</td></tr>
+<tr><td>Headers</td><td>{{.HeaderNote}}</td></tr>
 <tr><td>Result</td><td>{{.Total}} exchange(s): {{.Passed}} passed, {{.Failed}} failed</td></tr>
 </table>
 {{if .Notes}}<h2>Notes</h2><pre>{{.Notes}}</pre>{{end}}

@@ -50,6 +50,9 @@ func TestExecuteRecordsRequestAsSent(t *testing.T) {
 	if got := h["Authorization"]; len(got) != 1 || !strings.HasPrefix(got[0], "Basic ") {
 		t.Errorf("Authorization = %v, want a Basic header", got)
 	}
+	if got := h["Content-Length"]; len(got) != 1 || got[0] != "10" {
+		t.Errorf("Content-Length = %v, want 10 (the length of the body that was sent)", got)
+	}
 	if res.Request.Body != `{"a":"42"}` || res.Request.Method != "POST" || !strings.HasSuffix(res.Request.URL, "/x") {
 		t.Errorf("request = %+v", res.Request)
 	}
