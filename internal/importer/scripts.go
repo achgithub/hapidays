@@ -111,3 +111,10 @@ func assertionsFromScript(script string) []model.Assertion {
 	}
 	return out
 }
+
+// SuggestFromScript exposes the recognisers to the UI's "Suggest from script"
+// button, so there is a single implementation of the patterns rather than a
+// second copy in the front end drifting out of sync with the importer.
+func SuggestFromScript(script string) ([]model.Capture, []model.Assertion) {
+	return capturesFromScript(script), assertionsFromScript(script)
+}

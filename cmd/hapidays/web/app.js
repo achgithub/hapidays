@@ -849,54 +849,37 @@ function renderAssertionSummary(assertions) {
     ).join('') + '</ul>';
 }
 
-// Best-effort scan of imported Postman scripts for the handful of
-// pm.*.set(...) patterns that map cleanly onto a Capture rule (see the
-// table in the app's docs). Anything with conditionals, loops, or string
-// manipulation isn't recognized — those have no Capture equivalent and
-// still need a human to read the script.
-function suggestCapturesFromScript() {
+// Best-effort scan of the request's imported Postman scripts for the idioms
+// that map cleanly onto a Capture rule or an Assertion (status checks,
+// storing a response header/JSON field in a variable). The recognition
+// itself lives on the server (internal/importer/scripts.go) so the button
+// and the importer can never disagree. Anything with conditionals, loops, or
+// string manipulation isn't recognized and still needs a human to read it.
+async function runSuggestCaptures() {
   const script = (currentRequest.testScript || '') + '\n' + (currentRequest.preRequestScript || '');
-  const SETTER = String.raw`pm\.(?:environment|collectionVariables|globals)\.set`;
-  const suggestions = [];
-
-  // Inline forms: pm.environment.set("x", pm.response.headers.get("H")) / .json().a.b
-  const headerDirectRe = new RegExp(SETTER + String.raw`\(\s*["']([^"']+)["']\s*,\s*pm\.response\.headers\.get\(\s*["']([^"']+)["']\s*\)\s*\)`, 'g');
-  for (const m of script.matchAll(headerDirectRe)) suggestions.push({ source: 'header', from: m[2], intoVar: m[1] });
-
-  const jsonDirectRe = new RegExp(SETTER + String.raw`\(\s*["']([^"']+)["']\s*,\s*pm\.response\.json\(\)\.([\w.]+)\s*\)`, 'g');
-  for (const m of script.matchAll(jsonDirectRe)) suggestions.push({ source: 'body_json', from: m[2], intoVar: m[1] });
-
-  // Via-intermediate-variable forms — the common case in practice (e.g. the
-  // stock SAP/OData "X-CSRF-Token: Fetch" script): a var/let/const captures
-  // the header or json() call, and a later pm.*.set(...) statement uses it.
-  const assignRe = /(?:var|let|const)\s+(\w+)\s*=\s*pm\.response\.(headers\.get\(\s*["']([^"']+)["']\s*\)|json\(\))/g;
-  for (const am of script.matchAll(assignRe)) {
-    const varName = am[1];
-    if (am[2].startsWith('headers')) {
-      const headerName = am[3];
-      const useRe = new RegExp(SETTER + String.raw`\(\s*["']([^"']+)["']\s*,\s*` + varName + String.raw`\s*\)`, 'g');
-      for (const m of script.matchAll(useRe)) suggestions.push({ source: 'header', from: headerName, intoVar: m[1] });
-    } else {
-      const useRe = new RegExp(SETTER + String.raw`\(\s*["']([^"']+)["']\s*,\s*` + varName + String.raw`\.([\w.]+)\s*\)`, 'g');
-      for (const m of script.matchAll(useRe)) suggestions.push({ source: 'body_json', from: m[2], intoVar: m[1] });
-    }
+  let found;
+  try {
+    found = await api('/scripts/suggest', { method: 'POST', body: JSON.stringify({ script }) });
+  } catch (err) {
+    alert('Could not scan the script: ' + err.message);
+    return;
   }
-  return suggestions;
-}
-
-function runSuggestCaptures() {
-  const suggestions = suggestCapturesFromScript();
-  const existing = currentRequest.captures || (currentRequest.captures = []);
+  const captures = currentRequest.captures || (currentRequest.captures = []);
+  const assertions = currentRequest.assertions || (currentRequest.assertions = []);
   let added = 0;
-  for (const s of suggestions) {
-    const dupe = existing.some(c => c.source === s.source && c.from === s.from && c.intoVar === s.intoVar);
-    if (!dupe) { existing.push(s); added++; }
+  for (const c of found.captures) {
+    if (!captures.some(e => e.source === c.source && e.from === c.from && e.intoVar === c.intoVar)) { captures.push(c); added++; }
+  }
+  for (const a of found.assertions) {
+    if (!assertions.some(e => e.type === a.type && (e.target || '') === (a.target || '') && (e.expected || '') === (a.expected || ''))) { assertions.push(a); added++; }
   }
   renderCapturesTable();
-  if (suggestions.length === 0) {
-    alert('No recognizable pm.environment.set(...) patterns found in the scripts above — this script likely needs manual conversion (conditionals, loops, or chained requests aren\'t supported by Capture rules).');
+  renderAssertionsTable();
+  updateTabBadges();
+  if (found.captures.length + found.assertions.length === 0) {
+    alert('No recognizable capture or status-check patterns found in the scripts above — this script likely needs manual conversion (conditionals, loops, or chained requests aren\'t supported by Capture or Assertion rules).');
   } else if (added === 0) {
-    alert('Found the same pattern(s) already present as capture rules — nothing new to add.');
+    alert('Found the same pattern(s) already present as rules — nothing new to add.');
   }
 }
 

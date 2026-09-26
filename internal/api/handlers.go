@@ -71,6 +71,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/environments/{id}", s.originGuard(s.deleteEnvironment))
 
 	s.mux.HandleFunc("POST /api/send", s.originGuard(s.send))
+	s.mux.HandleFunc("POST /api/scripts/suggest", s.originGuard(s.suggestFromScript))
 	s.mux.HandleFunc("POST /api/curl/import", s.originGuard(s.curlImport))
 	s.mux.HandleFunc("POST /api/curl/export", s.originGuard(s.curlExport))
 	s.mux.HandleFunc("GET /api/history", s.originGuard(s.listHistory))
@@ -833,6 +834,26 @@ func (s *Server) send(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, 200, result)
+}
+
+// suggestFromScript returns the Captures and Assertions recognised in a
+// (Postman-style) script — the same recognition the importer applies.
+func (s *Server) suggestFromScript(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Script string `json:"script"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	captures, assertions := importer.SuggestFromScript(req.Script)
+	if captures == nil {
+		captures = []model.Capture{}
+	}
+	if assertions == nil {
+		assertions = []model.Assertion{}
+	}
+	writeJSON(w, 200, map[string]any{"captures": captures, "assertions": assertions})
 }
 
 func (s *Server) curlImport(w http.ResponseWriter, r *http.Request) {
