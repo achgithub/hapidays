@@ -988,9 +988,9 @@ func (s *Server) runCollection(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	results := runner.Run(ctx, nodes, runner.Options{
-		Vars:     vars,
-		DataRows: req.DataRows,
-		DelayMS:  req.DelayMS,
+		Vars:      vars,
+		DataRows:  req.DataRows,
+		DelayMS:   req.DelayMS,
 		OnCapture: func(captured map[string]string) { s.saveCaptured(req.EnvironmentID, captured) },
 		Client: client.Options{
 			Settings:           settings,

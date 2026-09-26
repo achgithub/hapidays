@@ -4,12 +4,12 @@
 //
 // Postman's JSON is polymorphic in several places (see the raw* types
 // below) so this file parses into loose intermediate structs first, then
-// normalizes. Deliberately NOT handled: pm.* pre-request/test scripts are
-// parsed and kept verbatim on the RequestSpec (HasScript=true) but never
-// executed — there is no JS engine here. The one script pattern that
-// matters in practice, SAP/OData's "X-CSRF-Token: Fetch" + capture, is
-// instead covered by model.Capture, which the UI can set up per-request
-// without running arbitrary JS.
+// normalizes. pm.* pre-request/test scripts are parsed and kept verbatim on
+// the RequestSpec (HasScript=true) but never executed — there is no JS
+// engine here. The common idioms in a test script (status checks, and
+// storing a response header or JSON field in a variable, e.g. SAP/OData's
+// "X-CSRF-Token: Fetch") are instead recognised by pattern and imported as
+// model.Assertion and model.Capture — see scripts.go.
 package importer
 
 import (
@@ -354,6 +354,8 @@ func convertRequest(r rawRequest, events []rawEvent) *model.RequestSpec {
 			spec.PreRequestScript = script
 		} else if ev.Listen == "test" {
 			spec.TestScript = script
+			spec.Captures = append(spec.Captures, capturesFromScript(script)...)
+			spec.Assertions = append(spec.Assertions, assertionsFromScript(script)...)
 		}
 	}
 	return spec
