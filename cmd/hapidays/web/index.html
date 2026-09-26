@@ -315,6 +315,12 @@
   <div class="modal" id="modalContent" role="dialog" aria-modal="true"></div>
 </div>
 
+<!-- The evidence dialog gets its own overlay, above the main one, so it can be opened from
+     inside another dialog (a step-through's log) without replacing it. -->
+<div id="evidenceOverlay" class="modal-overlay hidden" style="z-index:60">
+  <div class="modal" id="evidenceContent" role="dialog" aria-modal="true"></div>
+</div>
+
 <div class="palette-overlay hidden" id="paletteOverlay">
   <div class="palette">
     <div class="palette-input-row">

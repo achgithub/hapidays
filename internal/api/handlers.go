@@ -73,7 +73,6 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("POST /api/send", s.originGuard(s.send))
 	s.mux.HandleFunc("POST /api/evidence", s.originGuard(s.createEvidence))
-	s.mux.HandleFunc("GET /api/evidence/{id}", s.originGuard(s.getEvidence))
 	s.mux.HandleFunc("GET /api/evidence/{id}/report", s.originGuard(s.evidenceReport))
 	s.mux.HandleFunc("GET /api/evidence/{id}/text", s.originGuard(s.evidenceText))
 	s.mux.HandleFunc("POST /api/scripts/suggest", s.originGuard(s.suggestFromScript))
@@ -927,15 +926,6 @@ func setDownload(w http.ResponseWriter, r *http.Request, pack *model.EvidencePac
 	}
 	name := "evidence-" + pack.SavedAt.UTC().Format("20060102-150405") + "-" + pack.ID[:6] + "." + ext
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
-}
-
-func (s *Server) getEvidence(w http.ResponseWriter, r *http.Request) {
-	pack := s.loadEvidenceOr404(w, r)
-	if pack == nil {
-		return
-	}
-	setDownload(w, r, pack, "json")
-	writeJSON(w, 200, pack)
 }
 
 func (s *Server) evidenceText(w http.ResponseWriter, r *http.Request) {

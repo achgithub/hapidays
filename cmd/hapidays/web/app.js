@@ -1922,6 +1922,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
     <p class="hint" id="stepProgress"></p>
     <div id="stepLog"></div>
     <div class="modal-actions">
+      <button id="stepSaveAll" disabled title="Save every step run so far as test evidence">Save all as evidence</button>
       <button id="stepStop">Stop</button>
       <button id="stepRunToEnd">Run to end ⏩</button>
       <button id="stepNext" style="background:var(--accent);color:#fff">Step ▶</button>
@@ -1939,6 +1940,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
   let idx = 0;
   let stopped = false;
   const log = $('#stepLog');
+  const executed = []; // { name, result } for every step that got a response, in order — what "Save all" saves
 
   const renderProgress = () => {
     if (idx >= steps.length) {
@@ -1991,6 +1993,15 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
         <pre>${escapeHtml(bodyPreview)}${capturedText ? escapeHtml(capturedText) : ''}${assertionText ? escapeHtml(assertionText) : ''}</pre>
       `;
       if (result.captured && Object.keys(result.captured).length) await loadEnvironments();
+      const entry = { name: rowTag + node.name, result };
+      executed.push(entry);
+      $('#stepSaveAll').disabled = false;
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = 'Save evidence';
+      saveBtn.title = 'Save this step\'s request and response as test evidence';
+      saveBtn.style.marginTop = '6px';
+      saveBtn.onclick = () => openSaveEvidenceModal([entry], { collectionId });
+      card.appendChild(saveBtn);
     } catch (e) {
       card.querySelector('.step-card-output').innerHTML = `<span style="color:var(--danger)">← failed: ${escapeHtml(e.message)}</span>`;
     }
@@ -2019,6 +2030,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
   };
   // "Stop" during a Run-to-end just halts the loop after the in-flight
   // request finishes — the modal stays open showing the log so far.
+  $('#stepSaveAll').onclick = () => openSaveEvidenceModal(executed.slice(), { collectionId });
   $('#stepStop').onclick = () => { stopped = true; closeModal(); };
 }
 
@@ -2178,10 +2190,18 @@ function readEvidenceWho() {
 // Saves one or more executed requests as an evidence pack. items is
 // [{ name, result }] where result is what /api/send returned. Redaction of
 // credentials happens on the server before anything is written.
+function showEvidenceModal(html) {
+  $('#evidenceContent').innerHTML = html;
+  $('#evidenceOverlay').classList.remove('hidden');
+}
+function closeEvidenceModal() {
+  $('#evidenceOverlay').classList.add('hidden');
+}
+
 function openSaveEvidenceModal(items, { collectionId } = {}) {
   const n = items.length;
   const colId = collectionId !== undefined ? collectionId : (state.currentCollection ? state.currentCollection.id : '');
-  showModal(`
+  showEvidenceModal(`
     <h3>Save test evidence</h3>
     <p class="hint">${n === 1 ? 'Saves this request and its response' : `Saves these ${n} requests and their responses`},
     with the headers as sent and as received. Credentials are replaced by short fingerprints (the same value always
@@ -2199,7 +2219,7 @@ function openSaveEvidenceModal(items, { collectionId } = {}) {
       <button id="evSave" style="background:var(--accent);color:#fff">Save</button>
     </div>
   `);
-  $('#evCancel').onclick = closeModal;
+  $('#evCancel').onclick = closeEvidenceModal;
   $('#evSave').onclick = async () => {
     const who = $('#evWho').value.trim();
     const err = $('#evError');
@@ -2230,8 +2250,7 @@ function openSaveEvidenceModal(items, { collectionId } = {}) {
         <p><a href="${base}/report" target="_blank" rel="noopener">Open report</a> &middot;
         <a href="${base}/text" target="_blank" rel="noopener">Plain text</a> &middot;
         Download: <a href="${base}/text?download=1">.txt</a>,
-        <a href="${base}/report?download=1">.html</a>,
-        <a href="${base}?download=1">.json</a></p>`;
+        <a href="${base}/report?download=1">.html</a></p>`;
       $('#evSave').classList.add('hidden');
       $('#evCancel').textContent = 'Close';
     } catch (e) {
@@ -3159,6 +3178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#bodyRawHighlight').scrollLeft = $('#bodyRaw').scrollLeft;
   });
   $('#modalOverlay').onclick = (e) => { if (e.target === $('#modalOverlay')) closeModal(); };
+  $('#evidenceOverlay').onclick = (e) => { if (e.target === $('#evidenceOverlay')) closeEvidenceModal(); };
 
   // ---------- protocol switcher ----------
   $$('#protoSwitch .proto-opt').forEach(btn => {
@@ -3231,6 +3251,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); togglePalette(); return; }
     if (!$('#paletteOverlay').classList.contains('hidden') && e.key === 'Escape') { closePalette(); return; }
+    // Escape closes the topmost dialog: the evidence one sits above the main one.
+    if (!$('#evidenceOverlay').classList.contains('hidden') && e.key === 'Escape') { closeEvidenceModal(); return; }
     if (!$('#modalOverlay').classList.contains('hidden') && e.key === 'Escape') { closeModal(); return; }
     // Below here, ignore shortcuts fired from within the palette input or a
     // modal — Enter in those has its own meaning already wired above.
