@@ -72,7 +72,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/environments/{id}", s.originGuard(s.deleteEnvironment))
 
 	s.mux.HandleFunc("POST /api/send", s.originGuard(s.send))
+	s.mux.HandleFunc("GET /api/evidence", s.originGuard(s.listEvidence))
 	s.mux.HandleFunc("POST /api/evidence", s.originGuard(s.createEvidence))
+	s.mux.HandleFunc("DELETE /api/evidence/{id}", s.originGuard(s.deleteEvidence))
 	s.mux.HandleFunc("GET /api/evidence/{id}/report", s.originGuard(s.evidenceReport))
 	s.mux.HandleFunc("GET /api/evidence/{id}/text", s.originGuard(s.evidenceText))
 	s.mux.HandleFunc("POST /api/scripts/suggest", s.originGuard(s.suggestFromScript))
@@ -926,6 +928,28 @@ func setDownload(w http.ResponseWriter, r *http.Request, pack *model.EvidencePac
 	}
 	name := "evidence-" + pack.SavedAt.UTC().Format("20060102-150405") + "-" + pack.ID[:6] + "." + ext
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+}
+
+func (s *Server) listEvidence(w http.ResponseWriter, r *http.Request) {
+	list, err := s.store.ListEvidence()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, list)
+}
+
+func (s *Server) deleteEvidence(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !store.ValidEvidenceID(id) {
+		writeErr(w, 400, fmt.Errorf("invalid evidence id"))
+		return
+	}
+	if err := s.store.DeleteEvidence(id); err != nil {
+		writeErr(w, 404, fmt.Errorf("evidence pack not found"))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) evidenceText(w http.ResponseWriter, r *http.Request) {

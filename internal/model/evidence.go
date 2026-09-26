@@ -56,3 +56,18 @@ type EvidencePack struct {
 	CredentialsRedacted bool           `json:"credentialsRedacted"`
 	Items               []EvidenceItem `json:"items"`
 }
+
+// EvidenceSummary is one line of the saved-evidence list: enough to recognise
+// a pack without loading its bodies.
+type EvidenceSummary struct {
+	ID                  string    `json:"id"`
+	SavedAt             time.Time `json:"savedAt"`
+	Who                 string    `json:"who"`
+	Notes               string    `json:"notes,omitempty"`
+	CollectionName      string    `json:"collectionName,omitempty"`
+	EnvironmentName     string    `json:"environmentName,omitempty"`
+	CredentialsRedacted bool      `json:"credentialsRedacted"`
+	Items               int       `json:"items"`
+	Passed              int       `json:"passed"`
+	Failed              int       `json:"failed"`
+}

@@ -2283,6 +2283,94 @@ function openSaveEvidenceModal(items, { collectionId } = {}) {
   $('#evWho').focus();
 }
 
+// The saved-evidence list: every pack saved so far, newest first, with the
+// ways to get at it — open the report, open the plain text, copy the text to
+// the clipboard (the usual next step is pasting it into an email or ticket),
+// or delete it.
+async function openEvidenceListModal() {
+  showModal(`
+    <h3>Saved test evidence</h3>
+    <p class="hint" id="evListHint">Loading&hellip;</p>
+    <div id="evList" class="kv-table"></div>
+    <div class="modal-actions"><button id="evListClose">Close</button></div>
+  `);
+  $('#modalContent').classList.add('modal-wide');
+  $('#evListClose').onclick = closeModal;
+  await renderEvidenceList();
+}
+
+async function renderEvidenceList() {
+  const hint = $('#evListHint');
+  const container = $('#evList');
+  let list;
+  try {
+    list = (await api('/evidence')) || [];
+  } catch (e) {
+    hint.textContent = 'Could not load the list: ' + e.message;
+    return;
+  }
+  container.innerHTML = '';
+  hint.textContent = list.length
+    ? `${list.length} saved pack${list.length === 1 ? '' : 's'}, newest first. Save one from the Save evidence button on a response, a step, or a run.`
+    : 'Nothing saved yet. Use the Save evidence button on a response, a step, or a run result.';
+  for (const p of list) {
+    const row = document.createElement('div');
+    row.className = 'kv-row';
+    row.style.alignItems = 'flex-start';
+    const notes = (p.notes || '').replace(/\s+/g, ' ').trim();
+    const context = [p.environmentName, p.collectionName].filter(Boolean).join(' · ');
+    row.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div><strong>${escapeHtml(new Date(p.savedAt).toLocaleString())}</strong> &middot; ${escapeHtml(p.who || '')}</div>
+        <div style="font-size:12px">${p.items} exchange${p.items === 1 ? '' : 's'}:
+          <span style="color:var(--ok)">${p.passed} passed</span>,
+          <span style="color:${p.failed ? 'var(--danger)' : 'inherit'}">${p.failed} failed</span>
+          ${context ? '&middot; ' + escapeHtml(context) : ''}
+          ${p.credentialsRedacted ? '' : '&middot; <strong style="color:var(--danger)">credentials included</strong>'}</div>
+        ${notes ? `<div style="font-size:12px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(notes)}</div>` : ''}
+      </div>
+      <span class="col-actions" style="display:flex;gap:6px;flex-shrink:0"></span>`;
+    const actions = row.querySelector('.col-actions');
+    const link = (label, href, title) => {
+      const a = document.createElement('a');
+      a.textContent = label; a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.title = title;
+      a.style.alignSelf = 'center';
+      return a;
+    };
+    actions.appendChild(link('Open', `/api/evidence/${p.id}/report`, 'Open the HTML report in a new tab'));
+    actions.appendChild(link('Text', `/api/evidence/${p.id}/text`, 'Open the plain text in a new tab'));
+    const copy = document.createElement('button');
+    copy.textContent = 'Copy';
+    copy.title = 'Copy the plain text to the clipboard, ready to paste';
+    copy.onclick = async () => {
+      try {
+        const res = await fetch(`/api/evidence/${p.id}/text`);
+        if (!res.ok) throw new Error(res.statusText);
+        await navigator.clipboard.writeText(await res.text());
+        copy.textContent = 'Copied ✓';
+        setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+      } catch (e) {
+        alert('Could not copy: ' + e.message);
+      }
+    };
+    actions.appendChild(copy);
+    const del = document.createElement('button');
+    del.textContent = 'Delete';
+    del.className = 'col-action-danger';
+    del.onclick = async () => {
+      if (!confirm('Delete this evidence pack? This cannot be undone.')) return;
+      try {
+        await api(`/evidence/${p.id}`, { method: 'DELETE' });
+        await renderEvidenceList();
+      } catch (e) {
+        alert('Could not delete: ' + e.message);
+      }
+    };
+    actions.appendChild(del);
+    container.appendChild(row);
+  }
+}
+
 // ---------- export ----------
 
 function downloadJson(data, filename) {
@@ -2411,6 +2499,7 @@ function openHelpModal() {
       <a href="#help-environments">Environments</a>
       <a href="#help-running">Sending &amp; running</a>
       <a href="#help-history">History</a>
+      <a href="#help-evidence">Test evidence</a>
       <a href="#help-cookies">Cookie jar</a>
       <a href="#help-settings">Settings &amp; network</a>
       <a href="#help-palette">Command palette</a>
@@ -2526,6 +2615,34 @@ function openHelpModal() {
     <p class="hint">Every send is logged — method, URL, status, duration, size — and can be reopened back into
     the editor to inspect or re-send. Best-effort restores the collection/environment it ran under too, so
     <code>{{vars}}</code> resolve the same way they did the first time.</p>
+
+    <div id="help-evidence" class="help-eyebrow">Executing</div>
+    <h4>Test evidence</h4>
+    <p class="hint">A record of what was sent and what came back, to hand to a reviewer as proof a test was done.
+    <strong>Save evidence</strong> appears next to the response status after a Send; each card in
+    <em>Step through…</em> has one, plus <em>Save all as evidence</em>; and each row of a run's results has a
+    <em>Save</em> button, plus <em>Save all as evidence</em>. You enter who is saving it (remembered) and free-text
+    notes.</p>
+    <dl class="help-dl">
+      <dt>What's in it</dt><dd>For each request: the method and resolved URL, the headers as actually sent
+        (after auth and the cookie jar were applied), the body, then the response status, headers and body, the
+        assertion results and a pass/fail verdict. When the response carries a CPI message-processing-log id
+        (<code>SAP_MessageProcessingLogID</code>) it is shown, so the call can be found in the tenant's monitor.</dd>
+      <dt>Credentials</dt><dd>Redacted by default, before anything is written to disk: by header (Authorization,
+        Cookie, Set-Cookie, CSRF tokens), by field name in JSON, form, XML and query strings (password, secret,
+        token&hellip;), and by the value of any secret-named variable wherever it appears. Each is replaced by a
+        short fingerprint, and the same value always gets the same one, so a reviewer can see the CSRF token from
+        one step is the one sent in the next without seeing it. Cookie <em>names</em> stay visible. Ticking
+        <em>Include credentials</em> saves them as-is and marks the pack so.</dd>
+      <dt>Formats</dt><dd>A light HTML page (an index at the top links to each request; plain text blocks you can
+        select and copy) and plain text that pastes straight into an email or ticket. Download either, or use
+        <em>Copy</em> in the list.</dd>
+      <dt>The list</dt><dd>The icon at the top of the sidebar (a page with lines) lists every saved pack, newest
+        first, with Open, Text, Copy and Delete. Packs are files in the <code>evidence</code> folder of the data
+        directory.</dd>
+    </dl>
+    <p class="hint">Redaction is a safety net, not a guarantee: read a pack before sending it outside your team,
+    especially free-text notes and response bodies.</p>
 
     <div id="help-cookies" class="help-eyebrow">Executing</div>
     <h4>Cookie jar</h4>
@@ -3057,6 +3174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme(next);
   };
   $('#refreshBtn').onclick = refreshInPlace;
+  $('#evidenceBtn').onclick = openEvidenceListModal;
   $('#saveEvidenceBtn').onclick = () => { if (lastEvidenceSource) openSaveEvidenceModal([lastEvidenceSource]); };
   $('#sendBtn').onclick = sendRequest;
   $('#saveRequestBtn').onclick = saveCurrentRequest;

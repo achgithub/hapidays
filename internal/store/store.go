@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
+	"time"
 
 	"hapidays/internal/model"
 )
@@ -104,6 +106,64 @@ func (s *Store) LoadEvidence(id string) (*model.EvidencePack, error) {
 		return nil, fmt.Errorf("invalid evidence id")
 	}
 	return readJSON[model.EvidencePack](s.evidencePath(id))
+}
+
+// ListEvidence returns a summary of every saved pack, newest first. It decodes
+// only the header fields and each item's verdict, so listing stays cheap even
+// though a pack can hold large response bodies.
+func (s *Store) ListEvidence() ([]model.EvidenceSummary, error) {
+	entries, err := os.ReadDir(filepath.Join(s.dir, "evidence"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []model.EvidenceSummary{}, nil
+		}
+		return nil, err
+	}
+	type light struct {
+		ID                  string    `json:"id"`
+		SavedAt             time.Time `json:"savedAt"`
+		Who                 string    `json:"who"`
+		Notes               string    `json:"notes"`
+		CollectionName      string    `json:"collectionName"`
+		EnvironmentName     string    `json:"environmentName"`
+		CredentialsRedacted bool      `json:"credentialsRedacted"`
+		Items               []struct {
+			Passed bool `json:"passed"`
+		} `json:"items"`
+	}
+	out := []model.EvidenceSummary{}
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".json") || !ValidEvidenceID(strings.TrimSuffix(name, ".json")) {
+			continue
+		}
+		l, err := readJSON[light](filepath.Join(s.dir, "evidence", name))
+		if err != nil {
+			continue // a damaged file shouldn't hide the others
+		}
+		sum := model.EvidenceSummary{
+			ID: l.ID, SavedAt: l.SavedAt, Who: l.Who, Notes: l.Notes,
+			CollectionName: l.CollectionName, EnvironmentName: l.EnvironmentName,
+			CredentialsRedacted: l.CredentialsRedacted, Items: len(l.Items),
+		}
+		for _, it := range l.Items {
+			if it.Passed {
+				sum.Passed++
+			} else {
+				sum.Failed++
+			}
+		}
+		out = append(out, sum)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].SavedAt.After(out[j].SavedAt) })
+	return out, nil
+}
+
+func (s *Store) DeleteEvidence(id string) error {
+	if !ValidEvidenceID(id) {
+		return fmt.Errorf("invalid evidence id")
+	}
+	return os.Remove(s.evidencePath(id))
 }
 
 // ---- collections ----
