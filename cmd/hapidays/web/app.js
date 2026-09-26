@@ -1704,17 +1704,25 @@ function renderBatchResults(results) {
   container.appendChild(table);
 }
 
+// Whether a request "passed". If it has assertions they are the test and
+// decide the outcome on their own — so a deliberate failure case ("expect
+// 403", "expect 500") shows green when it fails the way it should. Only a
+// request with no assertions falls back to "got a 2xx/3xx and no transport
+// error". A transport error is never a pass.
+function stepPassed({ error, status, assertions }) {
+  if (error) return false;
+  if (assertions && assertions.length > 0) return assertions.every(a => a.passed);
+  return status >= 200 && status < 400;
+}
+
 function renderRunResults(results) {
-  // A step counts as passed only if it got a 2xx/3xx AND every enabled
-  // assertion on it passed — a request with a healthy status but a failed
-  // assertion (wrong body shape, missing header) is still a failed step.
-  const stepOk = (r) => !r.error && r.status >= 200 && r.status < 400 && r.assertionsPassed !== false;
+  const stepOk = (r) => stepPassed(r);
   const passCount = results.filter(stepOk).length;
   const anyAssertions = results.some(r => r.assertions && r.assertions.length > 0);
   const container = $('#runResults');
   container.innerHTML = '';
   const summary = document.createElement('p');
-  summary.textContent = `${passCount}/${results.length} passed (2xx/3xx, no transport error${anyAssertions ? ', all assertions' : ''})`;
+  summary.textContent = `${passCount}/${results.length} passed (a request with assertions passes when they all pass; otherwise it needs a 2xx/3xx${anyAssertions ? '' : ' and no transport error'})`;
   container.appendChild(summary);
   const table = document.createElement('div');
   table.className = 'kv-table';
@@ -1838,8 +1846,7 @@ async function openStepModal(collectionId, folderId, label, dataRows, delayMs) {
           insecureSkipVerify: currentInsecureSkipVerifyOverride(),
         }),
       });
-      const assertionsPassed = !result.assertions || result.assertions.every(a => a.passed);
-      const ok = !result.error && result.status >= 200 && result.status < 400 && assertionsPassed;
+      const ok = stepPassed(result);
       const capturedText = result.captured && Object.keys(result.captured).length
         ? `\ncaptured: ${JSON.stringify(result.captured)}` : '';
       const assertionText = result.assertions && result.assertions.length
@@ -2221,7 +2228,9 @@ function openHelpModal() {
     <p class="hint"><strong>Assertions</strong> are pass/fail checks against the response, evaluated without a
     scripting engine: status code equals or in a range, a header equals/exists, the body contains a substring, a
     JSON path equals a value or exists, or the response came back under a max duration. These are what let the
-    collection runner report pass/fail per request instead of just "here's what came back."</p>
+    collection runner report pass/fail per request instead of just "here's what came back." When a request has
+    assertions, they alone decide whether it passed — so a deliberate failure case (assert status 403) shows green
+    when it fails the way you expect. A request with no assertions passes if it gets a 2xx/3xx.</p>
 
     <div id="help-collections" class="help-eyebrow">Organizing</div>
     <h4>Collections</h4>

@@ -281,7 +281,8 @@
       <div class="tab-panel hidden" id="panel-assertions">
         <p class="hint">Pass/fail checks evaluated after the response comes back — no JS engine, same reasoning as Captures.
         Shown against a single Send, and aggregated into a pass/fail count when this request runs as part of a
-        collection run.</p>
+        collection run. A request that has assertions passes when they all pass, whatever the status, so a deliberate
+        failure case (e.g. expect 403) shows green; with none, it needs a 2xx/3xx.</p>
         <div id="assertionsTable" class="kv-table"></div>
         <button class="add-row" data-target="assertions">+ Add assertion</button>
       </div>
