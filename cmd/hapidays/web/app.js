@@ -910,8 +910,8 @@ const ASSERTION_TYPES = [
   { value: 'header_exists', label: 'Header exists', needsTarget: true, needsExpected: false, targetPlaceholder: 'Header name' },
   { value: 'header_equals', label: 'Header equals', needsTarget: true, needsExpected: true, targetPlaceholder: 'Header name', expectedPlaceholder: 'Value' },
   { value: 'body_contains', label: 'Body contains', needsTarget: false, needsExpected: true, expectedPlaceholder: 'substring' },
-  { value: 'json_path_exists', label: 'JSON path exists', needsTarget: true, needsExpected: false, targetPlaceholder: 'data.token' },
-  { value: 'json_path_equals', label: 'JSON path equals', needsTarget: true, needsExpected: true, targetPlaceholder: 'data.token', expectedPlaceholder: 'Value' },
+  { value: 'json_path_exists', label: 'JSON path exists', needsTarget: true, needsExpected: false, targetPlaceholder: 'data.token or d.results[0].id' },
+  { value: 'json_path_equals', label: 'JSON path equals', needsTarget: true, needsExpected: true, targetPlaceholder: 'data.token or d.results[0].id', expectedPlaceholder: 'Value' },
   { value: 'max_duration_ms', label: 'Max duration (ms)', needsTarget: false, needsExpected: true, expectedPlaceholder: '2000' },
 ];
 
@@ -2559,7 +2559,7 @@ function openHelpModal() {
     <div id="help-capassert" class="help-eyebrow">Requests</div>
     <h4>Captures &amp; assertions</h4>
     <p class="hint"><strong>Captures</strong> pull a value out of the response — a header, or a dotted JSON path
-    like <code>data.token</code> — into an environment variable, for the common "fetch a token, reuse it on the
+    like <code>data.token</code> (array items by index: <code>d.results[0].id</code> or <code>d.results.0.id</code>) — into an environment variable, for the common "fetch a token, reuse it on the
     next request" pattern, without needing a scripting engine. If you imported a Postman collection whose
     pre-request/test scripts do this with <code>pm.environment.set(...)</code>, <strong>Suggest Captures</strong>
     (on the Captures tab) recognizes the common inline forms and offers to convert them into Capture rules

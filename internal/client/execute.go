@@ -884,19 +884,70 @@ func statusInRange(status int, rangeSpec string) bool {
 }
 
 // jsonPathLookup resolves a dotted path like "data.token" against decoded JSON.
+// jsonPathLookup walks a dotted path through decoded JSON. Each part is an
+// object key, an array index written as a bare number ("results.0.id"), or
+// either followed by bracketed indexes in the Postman/JavaScript style
+// ("results[0].id", "matrix[1][2]") — OData responses are almost always an
+// array under d.results, so paths need to reach into arrays.
 func jsonPathLookup(v any, path string) (any, bool) {
 	cur := v
 	for _, part := range strings.Split(path, ".") {
-		m, ok := cur.(map[string]any)
+		base, indexes, ok := splitIndexes(part)
 		if !ok {
 			return nil, false
 		}
-		cur, ok = m[part]
-		if !ok {
-			return nil, false
+		if base != "" {
+			switch node := cur.(type) {
+			case map[string]any:
+				if cur, ok = node[base]; !ok {
+					return nil, false
+				}
+			case []any:
+				i, err := strconv.Atoi(base)
+				if err != nil || i < 0 || i >= len(node) {
+					return nil, false
+				}
+				cur = node[i]
+			default:
+				return nil, false
+			}
+		}
+		for _, i := range indexes {
+			arr, isArr := cur.([]any)
+			if !isArr || i < 0 || i >= len(arr) {
+				return nil, false
+			}
+			cur = arr[i]
 		}
 	}
 	return cur, true
+}
+
+// splitIndexes splits "name[0][2]" into "name" and [0 2]. ok is false for a
+// malformed index such as "name[x]" or "name[0".
+func splitIndexes(part string) (base string, indexes []int, ok bool) {
+	open := strings.Index(part, "[")
+	if open < 0 {
+		return part, nil, true
+	}
+	base = part[:open]
+	rest := part[open:]
+	for rest != "" {
+		if rest[0] != '[' {
+			return "", nil, false
+		}
+		end := strings.Index(rest, "]")
+		if end < 0 {
+			return "", nil, false
+		}
+		n, err := strconv.Atoi(rest[1:end])
+		if err != nil {
+			return "", nil, false
+		}
+		indexes = append(indexes, n)
+		rest = rest[end+1:]
+	}
+	return base, indexes, true
 }
 
 func isPrintable(b []byte) bool {
