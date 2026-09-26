@@ -81,6 +81,7 @@ async function loadCollections() {
 }
 
 function renderCollectionList() {
+  saveUiState();
   const container = $('#collectionList');
   container.innerHTML = '';
   for (const col of state.collections) {
@@ -305,6 +306,62 @@ async function openCollectionSettingsModal(collectionId) {
     if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = saved;
     closeModal();
   };
+}
+
+// ---------- remembering the UI across a browser reload ----------
+//
+// The selected environment, open collection, selected request and expanded
+// folders are kept in localStorage so a reload (F5) puts you back where you
+// were. Only ids are stored — the data itself always comes fresh from the
+// server — so anything that has since been deleted is simply skipped. Storage
+// can be blocked (private windows, site data cleared), so every access is
+// wrapped and the app works exactly as before without it.
+const UI_STATE_KEY = 'hapidays-ui-state';
+// False until the restore at startup has run, so the empty state that exists
+// while the page is still loading can't overwrite what was saved.
+let uiStateRestored = false;
+
+function saveUiState() {
+  if (!uiStateRestored) return;
+  try {
+    let selectedNodeId = null;
+    if (state.currentCollection && state.selectedPath) {
+      try { selectedNodeId = getNodeAt(state.selectedPath).id; } catch (_) { /* stale path */ }
+    }
+    localStorage.setItem(UI_STATE_KEY, JSON.stringify({
+      environmentId: state.currentEnvironmentId || '',
+      collectionId: state.currentCollection ? state.currentCollection.id : null,
+      selectedNodeId,
+      expanded: Array.from(state.expandedFolders),
+    }));
+  } catch (_) { /* storage unavailable — state just won't persist */ }
+}
+
+function readUiState() {
+  try { return JSON.parse(localStorage.getItem(UI_STATE_KEY) || 'null'); } catch (_) { return null; }
+}
+
+// Applies a previously saved state once collections and environments have
+// loaded. Each piece is restored only if it still exists.
+async function restoreUiState(saved) {
+  if (!saved) return;
+  if (saved.environmentId && state.environments.some(e => e.id === saved.environmentId)) {
+    state.currentEnvironmentId = saved.environmentId;
+    $('#envSelect').value = saved.environmentId;
+  }
+  (saved.expanded || []).forEach(id => state.expandedFolders.add(id));
+  if (saved.collectionId && state.collections.some(c => c.id === saved.collectionId)) {
+    try {
+      state.currentCollection = await api(`/collections/${saved.collectionId}`);
+    } catch (_) {
+      state.currentCollection = null;
+    }
+    const path = (state.currentCollection && saved.selectedNodeId)
+      ? findPathById(state.currentCollection.root, saved.selectedNodeId) : null;
+    const node = path ? getNodeAt(path) : null;
+    if (node && node.request) selectRequest(path); // also renders the tree and loads the editor
+    else renderCollectionList();
+  }
 }
 
 // Finds the index path to the node with this id, or null.
@@ -2919,7 +2976,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  $('#envSelect').onchange = (e) => { state.currentEnvironmentId = e.target.value; };
+  $('#envSelect').onchange = (e) => { state.currentEnvironmentId = e.target.value; saveUiState(); };
 
   $$('#requestTabs .tab').forEach(tab => {
     tab.onclick = () => {
@@ -3097,7 +3154,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderRequestForm();
   updateTlsWarnDot();
-  loadCollections();
-  loadEnvironments();
-  loadHistory();
+  const savedUiState = readUiState(); // read before anything renders and could overwrite it
+  Promise.all([loadCollections(), loadEnvironments(), loadHistory()])
+    .then(() => restoreUiState(savedUiState))
+    .finally(() => { uiStateRestored = true; saveUiState(); });
 });
