@@ -3,7 +3,10 @@
 // importer works against these plain, order-preserving types instead.
 package model
 
-import "time"
+import (
+	"regexp"
+	"time"
+)
 
 type KV struct {
 	Key      string `json:"key"`
@@ -220,10 +223,17 @@ type Collection struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+// Environment is one system a collection can be pointed at (Dev, QAS, PRD…):
+// the per-system values — host, credentials — for that collection's
+// variables. It is owned by exactly one collection (CollectionID), so a
+// collection's environments are its own and don't leak into any other.
+// CollectionID is empty only for environments saved before ownership
+// existed; the UI offers to assign those to a collection.
 type Environment struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Values []KV   `json:"values"`
+	ID           string `json:"id"`
+	CollectionID string `json:"collectionId,omitempty"`
+	Name         string `json:"name"`
+	Values       []KV   `json:"values"`
 	// ClientCertFile/ClientKeyFile, when set, override the global mTLS
 	// cert configured in Settings for requests sent under this
 	// environment — different environments (dev/test/prod) commonly need
@@ -233,6 +243,13 @@ type Environment struct {
 	ClientKeyFile  string    `json:"clientKeyFile,omitempty"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
+
+// secretKeyRe matches variable names that conventionally hold credentials.
+var secretKeyRe = regexp.MustCompile(`(?i)pass|secret|token|pwd|api[-_]?key|credential`)
+
+// IsSecretKey reports whether a variable name looks like it holds a
+// credential — used to blank values when a collection is exported.
+func IsSecretKey(key string) bool { return secretKeyRe.MatchString(key) }
 
 type HistoryEntry struct {
 	ID         string    `json:"id"`

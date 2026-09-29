@@ -253,9 +253,19 @@ type rawEnvironment struct {
 // for "root": a Postman export has no such key, a hapidays one always
 // does (even an empty collection has "root": []).
 func ImportCollection(data []byte, newID func() string) (*model.Collection, error) {
+	col, _, err := ImportCollectionBundle(data, newID)
+	return col, err
+}
+
+// ImportCollectionBundle is ImportCollection plus the environments a native
+// export carries under "environments" (see ExportCollectionBundle). The
+// returned environments are already owned by the returned collection and
+// have fresh IDs. A Postman file has no such thing, so it yields none —
+// Postman environments are imported separately, into a chosen collection.
+func ImportCollectionBundle(data []byte, newID func() string) (*model.Collection, []*model.Environment, error) {
 	var probe map[string]json.RawMessage
 	if err := json.Unmarshal(data, &probe); err != nil {
-		return nil, fmt.Errorf("parse collection: %w", err)
+		return nil, nil, fmt.Errorf("parse collection: %w", err)
 	}
 	if _, native := probe["root"]; native {
 		return importNativeCollection(data, newID)
@@ -263,7 +273,7 @@ func ImportCollection(data []byte, newID func() string) (*model.Collection, erro
 
 	var rc rawCollection
 	if err := json.Unmarshal(data, &rc); err != nil {
-		return nil, fmt.Errorf("parse collection: %w", err)
+		return nil, nil, fmt.Errorf("parse collection: %w", err)
 	}
 	col := &model.Collection{
 		ID:   newID(),
@@ -276,7 +286,7 @@ func ImportCollection(data []byte, newID func() string) (*model.Collection, erro
 		col.Auth = model.Auth{Type: model.AuthType(rc.Auth.Type), Params: rc.Auth.Params}
 	}
 	col.Root = convertItems(rc.Item, newID)
-	return col, nil
+	return col, nil, nil
 }
 
 // importNativeCollection re-imports a previously exported hapidays
@@ -284,14 +294,48 @@ func ImportCollection(data []byte, newID func() string) (*model.Collection, erro
 // rather than reused — re-importing your own export back into the same
 // instance, or importing it into someone else's, must never collide with
 // an existing collection/node ID.
-func importNativeCollection(data []byte, newID func() string) (*model.Collection, error) {
-	var col model.Collection
-	if err := json.Unmarshal(data, &col); err != nil {
-		return nil, fmt.Errorf("parse hapidays collection: %w", err)
+func importNativeCollection(data []byte, newID func() string) (*model.Collection, []*model.Environment, error) {
+	var bundle CollectionBundle
+	if err := json.Unmarshal(data, &bundle); err != nil {
+		return nil, nil, fmt.Errorf("parse hapidays collection: %w", err)
 	}
+	col := bundle.Collection
 	col.ID = newID()
 	reassignNodeIDs(col.Root, newID)
-	return &col, nil
+	envs := bundle.Environments
+	for _, e := range envs {
+		e.ID = newID()
+		e.CollectionID = col.ID
+	}
+	return &col, envs, nil
+}
+
+// CollectionBundle is the native export shape: the stored collection, flat,
+// plus its environments. Only exports carry "environments"; the stored
+// collection file never does (environments live in their own files).
+type CollectionBundle struct {
+	model.Collection
+	Environments []*model.Environment `json:"environments,omitempty"`
+}
+
+// ExportCollectionBundle bundles a collection with its environments for
+// sharing. Credentials never travel: values of secret-looking keys are
+// emptied, and per-environment client cert/key paths (machine-specific) are
+// dropped. Structure, hosts and non-secret values are kept, so whoever
+// imports it gets the same Dev/QAS/PRD layout and only fills in secrets.
+func ExportCollectionBundle(col *model.Collection, envs []*model.Environment) CollectionBundle {
+	b := CollectionBundle{Collection: *col}
+	for _, e := range envs {
+		cp := &model.Environment{ID: e.ID, Name: e.Name, UpdatedAt: e.UpdatedAt}
+		for _, kv := range e.Values {
+			if model.IsSecretKey(kv.Key) {
+				kv.Value = ""
+			}
+			cp.Values = append(cp.Values, kv)
+		}
+		b.Environments = append(b.Environments, cp)
+	}
+	return b
 }
 
 func reassignNodeIDs(nodes []*model.Node, newID func() string) {
@@ -414,6 +458,7 @@ func ImportEnvironment(data []byte, newID func() string) (*model.Environment, er
 			return nil, fmt.Errorf("parse hapidays environment: %w", err)
 		}
 		env.ID = newID()
+		env.CollectionID = "" // meaningless on another machine; the caller assigns the target collection
 		return &env, nil
 	}
 

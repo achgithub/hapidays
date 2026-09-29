@@ -59,6 +59,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/graphql/import", s.originGuard(s.importGraphQL))
 	s.mux.HandleFunc("POST /api/openapi/import", s.originGuard(s.importOpenAPI))
 	s.mux.HandleFunc("POST /api/grpc/import", s.originGuard(s.importGRPC))
+	s.mux.HandleFunc("GET /api/collections/{id}/export", s.originGuard(s.exportCollection))
 	s.mux.HandleFunc("GET /api/collections/{id}/export/postman", s.originGuard(s.exportCollectionPostman))
 	s.mux.HandleFunc("GET /api/collections/{id}", s.originGuard(s.getCollection))
 	s.mux.HandleFunc("PUT /api/collections/{id}", s.originGuard(s.saveCollection))
@@ -163,7 +164,14 @@ func (s *Server) importCollection(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	col, err := importer.ImportCollection(data, store.NewID)
+	s.saveImportedCollection(w, data)
+}
+
+// saveImportedCollection parses a native or Postman collection file, saves it
+// and any environments a native export bundled with it (owned by the new
+// collection), and writes the collection as the response.
+func (s *Server) saveImportedCollection(w http.ResponseWriter, data []byte) {
+	col, envs, err := importer.ImportCollectionBundle(data, store.NewID)
 	if err != nil {
 		writeErr(w, 400, err)
 		return
@@ -172,6 +180,13 @@ func (s *Server) importCollection(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.SaveCollection(col); err != nil {
 		writeErr(w, 500, err)
 		return
+	}
+	for _, env := range envs {
+		env.UpdatedAt = time.Now()
+		if err := s.store.SaveEnvironment(env); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
 	}
 	writeJSON(w, 200, col)
 }
@@ -194,17 +209,7 @@ func (s *Server) importCollectionURL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	col, err := importer.ImportCollection(data, store.NewID)
-	if err != nil {
-		writeErr(w, 400, err)
-		return
-	}
-	col.UpdatedAt = time.Now()
-	if err := s.store.SaveCollection(col); err != nil {
-		writeErr(w, 500, err)
-		return
-	}
-	writeJSON(w, 200, col)
+	s.saveImportedCollection(w, data)
 }
 
 // fetchRawFile GETs an arbitrary file over http(s) — used by the "import
@@ -452,6 +457,7 @@ func (s *Server) importOpenAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, env := range envs {
+		env.CollectionID = col.ID
 		env.UpdatedAt = time.Now()
 		if err := s.store.SaveEnvironment(env); err != nil {
 			writeErr(w, 500, err)
@@ -567,6 +573,28 @@ func (s *Server) getCollection(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, col)
 }
 
+// exportCollection is the native export: the collection plus its
+// environments with credentials blanked (see importer.ExportCollectionBundle).
+func (s *Server) exportCollection(w http.ResponseWriter, r *http.Request) {
+	col, err := s.store.LoadCollection(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, 404, err)
+		return
+	}
+	all, err := s.store.ListEnvironments()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	var owned []*model.Environment
+	for _, e := range all {
+		if e.CollectionID == col.ID {
+			owned = append(owned, e)
+		}
+	}
+	writeJSON(w, 200, importer.ExportCollectionBundle(col, owned))
+}
+
 // exportCollectionPostman is the one-way counterpart to importCollection's
 // Postman-recognizing path — renders col in Postman Collection Format v2.1
 // (see internal/importer/export.go) instead of hapidays's own native
@@ -603,7 +631,13 @@ func (s *Server) saveCollection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteCollection(w http.ResponseWriter, r *http.Request) {
-	if err := s.store.DeleteCollection(r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if err := s.store.DeleteCollection(id); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	// Its environments only make sense with it.
+	if err := s.store.DeleteEnvironmentsForCollection(id); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
@@ -627,11 +661,26 @@ func (s *Server) importEnvironment(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
+	s.saveImportedEnvironment(w, data, r.URL.Query().Get("collectionId"))
+}
+
+// saveImportedEnvironment imports a Postman or native environment file into
+// the given collection — an environment always belongs to one.
+func (s *Server) saveImportedEnvironment(w http.ResponseWriter, data []byte, collectionID string) {
+	if collectionID == "" {
+		writeErr(w, 400, fmt.Errorf("an environment belongs to a collection — open a collection and import into it"))
+		return
+	}
+	if _, err := s.store.LoadCollection(collectionID); err != nil {
+		writeErr(w, 400, fmt.Errorf("collection %q not found", collectionID))
+		return
+	}
 	env, err := importer.ImportEnvironment(data, store.NewID)
 	if err != nil {
 		writeErr(w, 400, err)
 		return
 	}
+	env.CollectionID = collectionID
 	env.UpdatedAt = time.Now()
 	if err := s.store.SaveEnvironment(env); err != nil {
 		writeErr(w, 500, err)
@@ -644,7 +693,8 @@ func (s *Server) importEnvironment(w http.ResponseWriter, r *http.Request) {
 // importCollectionURL.
 func (s *Server) importEnvironmentURL(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		URL string `json:"url"`
+		URL          string `json:"url"`
+		CollectionID string `json:"collectionId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, 400, err)
@@ -655,17 +705,7 @@ func (s *Server) importEnvironmentURL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	env, err := importer.ImportEnvironment(data, store.NewID)
-	if err != nil {
-		writeErr(w, 400, err)
-		return
-	}
-	env.UpdatedAt = time.Now()
-	if err := s.store.SaveEnvironment(env); err != nil {
-		writeErr(w, 500, err)
-		return
-	}
-	writeJSON(w, 200, env)
+	s.saveImportedEnvironment(w, data, req.CollectionID)
 }
 
 func (s *Server) getEnvironment(w http.ResponseWriter, r *http.Request) {
@@ -685,6 +725,13 @@ func (s *Server) saveEnvironment(w http.ResponseWriter, r *http.Request) {
 	}
 	env.ID = r.PathValue("id")
 	env.UpdatedAt = time.Now()
+	// A save that doesn't mention an owner must not orphan an owned
+	// environment.
+	if env.CollectionID == "" {
+		if prev, err := s.store.LoadEnvironment(env.ID); err == nil {
+			env.CollectionID = prev.CollectionID
+		}
+	}
 	if err := s.store.SaveEnvironment(&env); err != nil {
 		writeErr(w, 500, err)
 		return

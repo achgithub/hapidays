@@ -37,6 +37,11 @@ const state = {
   currentCollection: null, // full object incl. tree
   environments: [],
   currentEnvironmentId: '',
+  // The active environment is remembered per collection — CPI's PRD must not
+  // still be selected when you open another collection. envForCollection is
+  // the collection currentEnvironmentId was last resolved for.
+  envByCollection: {},
+  envForCollection: null,
   selectedPath: null,      // array of indices into currentCollection.root leading to the request node
   expandedFolders: new Set(), // node ids of folders currently expanded in the tree
   settings: {},
@@ -81,6 +86,7 @@ async function loadCollections() {
 }
 
 function renderCollectionList() {
+  renderEnvBar(); // the open collection may have changed — re-scope the environments
   saveUiState();
   const container = $('#collectionList');
   container.innerHTML = '';
@@ -104,8 +110,8 @@ function renderCollectionList() {
     const settings = document.createElement('span');
     settings.className = 'col-action';
     settings.textContent = '⚙';
-    settings.title = 'Collection settings (headers, variables & auth)';
-    settings.onclick = (e) => { e.stopPropagation(); openCollectionSettingsModal(col.id); };
+    settings.title = 'Configure (variables, environments, headers & auth)';
+    settings.onclick = (e) => { e.stopPropagation(); openConfigure(col.id); };
     actions.appendChild(settings);
 
     const exportBtn = document.createElement('span');
@@ -232,81 +238,7 @@ async function persistCollectionTree() {
   renderCollectionList();
 }
 
-// The auth a request set to "Inherit from collection" falls back to.
-// There's no per-folder auth in this model, so the collection is the only
-// thing a request can inherit from.
-// Collection-level settings that otherwise had no UI at all — Variables
-// (Collection.Variables) was only ever set by the Postman importer or a
-// raw API call, same gap Collection Auth had before it got this modal.
-async function openCollectionSettingsModal(collectionId) {
-  const col = (state.currentCollection && state.currentCollection.id === collectionId)
-    ? state.currentCollection
-    : await api(`/collections/${collectionId}`);
-  const variables = JSON.parse(JSON.stringify(col.variables || []));
-  const headers = JSON.parse(JSON.stringify(col.headers || []));
-  const auth = col.auth && col.auth.type ? JSON.parse(JSON.stringify(col.auth)) : { type: 'none', params: {} };
-  if (!auth.params) auth.params = {};
-
-  showModal(`
-    <h3>Collection settings — ${escapeHtml(col.name)}</h3>
-
-    <h4>Variables</h4>
-    <p class="hint">Available as {{key}} to every request in this collection. For values that change per
-    environment (host, port, credentials), put them in the active Environment instead — the environment's
-    value wins.</p>
-    <div id="colVarsTable" class="kv-table"></div>
-    <button class="add-row" id="colVarsAddRow">+ Add variable</button>
-
-    <h4>Headers</h4>
-    <p class="hint">Sent on every request in this collection. A request can override one by declaring a header
-    with the same name.</p>
-    <div id="colHeadersTable" class="kv-table"></div>
-    <button class="add-row" id="colHeadersAddRow">+ Add header</button>
-
-    <h4>Auth</h4>
-    <p class="hint">Used by any request in this collection set to "Inherit from collection".</p>
-    <div class="field-row"><label>Type</label>
-      <select id="colAuthType">
-        <option value="none">No Auth</option>
-        <option value="basic">Basic Auth</option>
-        <option value="digest">Digest Auth</option>
-        <option value="bearer">Bearer Token</option>
-        <option value="oauth2">OAuth 2.0</option>
-        <option value="apikey">API Key</option>
-        <option value="awsv4">AWS Signature (SigV4)</option>
-      </select>
-    </div>
-    <div id="colAuthFields" class="kv-table"></div>
-
-    <div class="modal-actions">
-      <button id="colSettingsCancel">Cancel</button>
-      <button id="colSettingsSave" style="background:var(--accent);color:#fff">Save</button>
-    </div>
-  `);
-
-  const renderVars = () => renderKVTable('colVarsTable', variables);
-  renderVars();
-  $('#colVarsAddRow').onclick = () => { variables.push({ key: '', value: '', disabled: false }); renderVars(); };
-
-  const renderHeaders = () => renderKVTable('colHeadersTable', headers);
-  renderHeaders();
-  $('#colHeadersAddRow').onclick = () => { headers.push({ key: '', value: '', disabled: false }); renderHeaders(); };
-
-  const rerenderAuth = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerenderAuth);
-  $('#colAuthType').value = auth.type;
-  rerenderAuth();
-  $('#colAuthType').onchange = (e) => { auth.type = e.target.value; rerenderAuth(); };
-
-  $('#colSettingsCancel').onclick = closeModal;
-  $('#colSettingsSave').onclick = async () => {
-    col.variables = variables;
-    col.headers = headers;
-    col.auth = auth;
-    const saved = await api(`/collections/${col.id}`, { method: 'PUT', body: JSON.stringify(col) });
-    if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = saved;
-    closeModal();
-  };
-}
+// Collection headers, variables, systems and auth are all edited in openConfigure() below.
 
 // ---------- remembering the UI across a browser reload ----------
 //
@@ -329,7 +261,7 @@ function saveUiState() {
       try { selectedNodeId = getNodeAt(state.selectedPath).id; } catch (_) { /* stale path */ }
     }
     localStorage.setItem(UI_STATE_KEY, JSON.stringify({
-      environmentId: state.currentEnvironmentId || '',
+      envByCollection: state.envByCollection,
       collectionId: state.currentCollection ? state.currentCollection.id : null,
       selectedNodeId,
       expanded: Array.from(state.expandedFolders),
@@ -345,9 +277,11 @@ function readUiState() {
 // loaded. Each piece is restored only if it still exists.
 async function restoreUiState(saved) {
   if (!saved) return;
-  if (saved.environmentId && state.environments.some(e => e.id === saved.environmentId)) {
-    state.currentEnvironmentId = saved.environmentId;
-    $('#envSelect').value = saved.environmentId;
+  state.envByCollection = Object.assign({}, saved.envByCollection || {});
+  // Older saves kept a single global environment id; it belongs to whichever
+  // collection was open then.
+  if (saved.environmentId && saved.collectionId && !state.envByCollection[saved.collectionId]) {
+    state.envByCollection[saved.collectionId] = saved.environmentId;
   }
   (saved.expanded || []).forEach(id => state.expandedFolders.add(id));
   if (saved.collectionId && state.collections.some(c => c.id === saved.collectionId)) {
@@ -1603,72 +1537,398 @@ async function saveCurrentRequest() {
 
 async function loadEnvironments() {
   state.environments = (await api('/environments')) || [];
-  const sel = $('#envSelect');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">No environment</option>';
-  for (const env of state.environments) {
-    const opt = document.createElement('option');
-    opt.value = env.id; opt.textContent = env.name;
-    sel.appendChild(opt);
-  }
-  sel.value = state.environments.some(e => e.id === prev) ? prev : '';
-  state.currentEnvironmentId = sel.value;
+  state.envForCollection = null; // force re-validation against the fresh list
+  renderEnvBar();
 }
 
-function openEnvEditor() {
-  const env = state.environments.find(e => e.id === state.currentEnvironmentId);
-  const values = env ? JSON.parse(JSON.stringify(env.values)) : [];
-  // editingId tracks which environment Save overwrites — null means Save
-  // creates a new one instead. Starts as env's id (editing in place);
-  // clicking Duplicate below clears it so Save creates a fresh copy
-  // rather than overwriting the one you duplicated from. This is how you
-  // build a Test environment out of Dev without retyping every variable:
-  // open Dev, Duplicate, rename, tweak the couple of values that differ.
-  let editingId = env ? env.id : null;
+// An environment belongs to one collection and is only ever shown under it.
+// One with no owner (saved before ownership existed) is kept on disk but not
+// shown anywhere until it's given a collectionId.
+const currentCollectionId = () => (state.currentCollection ? state.currentCollection.id : null);
+const collectionEnvs = () => state.environments.filter(e => e.collectionId && e.collectionId === currentCollectionId());
+const visibleEnvs = () => collectionEnvs();
 
+// The single place the active environment changes, so the pill bar can
+// never drift from state.currentEnvironmentId.
+function setActiveEnv(id) {
+  const cid = currentCollectionId();
+  state.envForCollection = cid; // resolved explicitly — don't let renderEnvBar re-resolve it
+  state.currentEnvironmentId = id || '';
+  if (cid) state.envByCollection[cid] = state.currentEnvironmentId;
+  renderEnvBar();
+  saveUiState();
+}
+
+// Names that look like a live system get a red tint so it's obvious when
+// the next Send will hit the real thing.
+const PROD_ENV_RE = /^(prod|prd|production|live)\b/i;
+
+// One pill per environment, plus "None". Overflow scrolls sideways rather
+// than wrapping, so any number of systems fits in the one row.
+function renderEnvBar() {
+  const box = $('#envPills');
+  if (!box) return;
+  const cid = currentCollectionId();
+  const visible = visibleEnvs();
+  if (cid !== state.envForCollection) {
+    // The open collection changed: pick up the environment last used in it.
+    state.envForCollection = cid;
+    const remembered = cid ? state.envByCollection[cid] : '';
+    state.currentEnvironmentId = visible.some(e => e.id === remembered) ? remembered : '';
+  } else if (!visible.some(e => e.id === state.currentEnvironmentId)) {
+    state.currentEnvironmentId = '';
+  }
+  box.innerHTML = '';
+  $('#configureBtn').disabled = !cid;
+  if (!cid) {
+    const hint = document.createElement('span');
+    hint.className = 'env-bar-empty';
+    hint.textContent = 'Open a collection to choose its environment';
+    box.appendChild(hint);
+    return;
+  }
+  const add = (id, name) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'env-pill' + (id === state.currentEnvironmentId ? ' active' : '')
+      + (id && PROD_ENV_RE.test(name) ? ' prod' : '') + (id ? '' : ' none');
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', id === state.currentEnvironmentId ? 'true' : 'false');
+    b.textContent = name;
+    if (id) b.title = 'Send requests against ' + name;
+    b.onclick = () => setActiveEnv(id);
+    box.appendChild(b);
+  };
+  add('', 'None');
+  collectionEnvs().forEach(e => add(e.id, e.name));
+  if (!collectionEnvs().length) {
+    const hint = document.createElement('span');
+    hint.className = 'env-bar-empty';
+    hint.textContent = 'No environments yet — Configure adds Dev, QAS, PRD…';
+    box.appendChild(hint);
+  }
+  const active = box.querySelector('.env-pill.active');
+  if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// ---------- configure: variables, systems, headers, auth ----------
+//
+// The one place a collection is set up. Its variables are a grid — one row
+// per variable, one column for the collection's Default and one per system
+// (Dev, QAS, PRD…) — so re-pointing a finished collection at another system
+// means filling in a few cells, not re-crafting anything. Systems are added,
+// renamed and removed from their column headers. Headers and Auth (the
+// collection-wide defaults every request inherits) sit below.
+//
+// It's only a view: values still live in Collection.Variables and
+// Environment.Values, so stored data and exports are unchanged. An empty
+// system cell means "use the Default", shown greyed in the cell. Everything
+// is drafted in memory and written on Save.
+const SECRET_KEY_RE = /pass|secret|token|pwd|api[-_]?key|credential/i;
+
+function scanVars(value, out) {
+  const re = /\{\{\s*([^{}\s]+)\s*\}\}/g;
+  const text = JSON.stringify(value);
+  let m;
+  while ((m = re.exec(text))) if (m[1][0] !== '$') out.add(m[1]);
+  return out;
+}
+
+// Every {{var}} this collection actually uses: its requests, plus the
+// collection-level headers and auth that requests inherit.
+function referencedVars(col) {
+  const out = new Set();
+  const walk = nodes => (nodes || []).forEach(n => {
+    if (n.request) scanVars(n.request, out);
+    walk(n.children);
+  });
+  walk(col.root);
+  scanVars(col.headers || [], out);
+  scanVars(col.auth || {}, out);
+  return out;
+}
+
+async function openConfigure(collectionId) {
+  if (!state.currentCollection || state.currentCollection.id !== collectionId) await openCollection(collectionId);
+  const col = state.currentCollection;
+  if (!col) return;
+
+  const findKV = (list, key) => (list || []).find(kv => kv.key === key);
+  const sysOf = e => ({
+    id: e.id, name: e.name, cert: e.clientCertFile || '', key: e.clientKeyFile || '', orig: e, isNew: false,
+  });
+
+  const systems = collectionEnvs().map(e => sysOf(e));
+  const removedSystems = [];
+  const headers = JSON.parse(JSON.stringify(col.headers || []));
+  const auth = col.auth && col.auth.type ? JSON.parse(JSON.stringify(col.auth)) : { type: 'none', params: {} };
+  if (!auth.params) auth.params = {};
+
+  const keys = [];
+  const seen = new Set();
+  const addKey = k => { if (k && !seen.has(k)) { seen.add(k); keys.push(k); } };
+  (col.variables || []).forEach(kv => addKey(kv.key));
+  referencedVars(col).forEach(addKey);
+  // Keys only an environment holds (e.g. a captured token) aren't this grid's
+  // business; they're left untouched on save.
+
+  const rows = keys.map(key => {
+    const d = findKV(col.variables, key);
+    const row = { key, def: d ? d.value : '', envs: {}, secret: SECRET_KEY_RE.test(key), reveal: false };
+    systems.forEach(s => { const kv = findKV(s.orig.values, key); row.envs[s.id] = kv ? kv.value : ''; });
+    return row;
+  });
+  const removedKeys = new Set();
+
+  $('#modalContent').classList.add('modal-wide');
   showModal(`
-    <h3>Environment</h3>
-    <p class="hint">The values that actually differ between Dev/QA/Prod — host, port, credentials, tenant IDs.
-    Anything the same across all of them belongs in the collection's Variables/Headers instead, so switching
-    environments is all it takes.</p>
-    <div class="field-row"><label>Name</label><input type="text" id="envNameInput" value="${escapeAttr(env ? env.name : 'New Environment')}"></div>
-    <div id="envValuesTable" class="kv-table"></div>
-    <button class="add-row" id="envAddRow">+ Add variable</button>
-    <div class="field-row"><label>Client cert (mTLS override)</label><input type="text" id="envClientCert" placeholder="leave blank to use the global Settings cert" value="${escapeAttr(env ? env.clientCertFile || '' : '')}"></div>
-    <div class="field-row"><label>Client key (mTLS override)</label><input type="text" id="envClientKey" placeholder="leave blank to use the global Settings cert" value="${escapeAttr(env ? env.clientKeyFile || '' : '')}"></div>
-    <p class="hint">Only needed if this environment (e.g. prod) uses a different client certificate than the one configured
-    in Settings. Leave both blank to fall back to the global cert.</p>
+    <h3>Configure — ${escapeHtml(col.name)}</h3>
+
+    <h4>Variables &amp; environments</h4>
+    <p class="hint">Set it up once against one environment, then fill in only what differs for the others — normally
+    the host and any credentials. A blank environment cell falls back to <strong>Default</strong>. Add, rename or
+    remove an environment from its column header.</p>
+    <div class="vars-scroll"><div id="varsGrid" class="vars-grid"></div></div>
+    <div class="vars-actions">
+      <button class="add-row" id="varsAddRow">+ Add variable</button>
+      <label class="link-btn">Import a Postman environment…<input id="cfgImportEnv" type="file" accept=".json" hidden></label>
+    </div>
+    <details class="adv"><summary>Advanced: client certificate per environment</summary>
+      <p class="hint">Only if an environment needs its own mTLS client certificate. Blank uses the one in Settings.</p>
+      <div id="certBox" class="cert-box"></div>
+    </details>
+
+    <h4>Headers</h4>
+    <p class="hint">Sent on every request in this collection. A request can override one by declaring a header
+    with the same name.</p>
+    <div id="colHeadersTable" class="kv-table"></div>
+    <button class="add-row" id="colHeadersAddRow">+ Add header</button>
+
+    <h4>Auth</h4>
+    <p class="hint">Used by any request in this collection set to "Inherit from collection". Put the secret in
+    a variable above (e.g. <code>{{password}}</code>) so it can differ per system.</p>
+    <div class="field-row"><label>Type</label>
+      <select id="colAuthType">
+        <option value="none">No Auth</option>
+        <option value="basic">Basic Auth</option>
+        <option value="digest">Digest Auth</option>
+        <option value="bearer">Bearer Token</option>
+        <option value="oauth2">OAuth 2.0</option>
+        <option value="apikey">API Key</option>
+        <option value="awsv4">AWS Signature (SigV4)</option>
+      </select>
+    </div>
+    <div id="colAuthFields" class="kv-table"></div>
+
     <div class="modal-actions">
-      <button id="envCancel">Cancel</button>
-      ${env ? '<button id="envDuplicate" title="Start a new environment pre-filled with these variables">Duplicate</button>' : ''}
-      <button id="envSave" style="background:var(--accent);color:#fff">Save</button>
+      <button id="cfgCancel">Cancel</button>
+      <button id="cfgSave" style="background:var(--accent);color:#fff">Save</button>
     </div>
   `);
 
-  const renderEnvTable = () => renderKVTable('envValuesTable', values);
-  renderEnvTable();
-  $('#envAddRow').onclick = () => { values.push({ key: '', value: '', disabled: false }); renderEnvTable(); };
-  $('#envCancel').onclick = closeModal;
-  if (env) {
-    $('#envDuplicate').onclick = () => {
-      editingId = null;
-      $('#envNameInput').value = env.name + ' copy';
-      $('#envDuplicate').remove();
+  const grid = $('#varsGrid');
+
+  const cell = (row, sysId) => {
+    const isDef = sysId === null;
+    const input = document.createElement('input');
+    input.type = row.secret && !row.reveal ? 'password' : 'text';
+    input.value = isDef ? row.def : row.envs[sysId];
+    input.autocomplete = 'off';
+    if (!isDef) input.placeholder = row.def !== '' ? (row.secret && !row.reveal ? '•••• (default)' : row.def) : '';
+    const flagUnset = () => input.classList.toggle('unset',
+      !isDef && sysId === state.currentEnvironmentId && input.value === '' && row.def === '');
+    input.oninput = () => { if (isDef) row.def = input.value; else row.envs[sysId] = input.value; flagUnset(); };
+    if (!isDef && sysId === state.currentEnvironmentId) input.classList.add('active-col');
+    flagUnset();
+    return input;
+  };
+
+  const renderCerts = () => {
+    const box = $('#certBox');
+    box.innerHTML = '';
+    if (!systems.length) { box.innerHTML = '<p class="hint">No environments yet.</p>'; return; }
+    systems.forEach(s => {
+      const line = document.createElement('div');
+      line.className = 'cert-row';
+      const label = document.createElement('span');
+      label.textContent = s.name || '(unnamed)';
+      const c = document.createElement('input');
+      c.type = 'text'; c.placeholder = 'client cert file (PEM)'; c.value = s.cert; c.oninput = () => { s.cert = c.value; };
+      const k = document.createElement('input');
+      k.type = 'text'; k.placeholder = 'client key file (PEM)'; k.value = s.key; k.oninput = () => { s.key = k.value; };
+      line.append(label, c, k);
+      box.appendChild(line);
+    });
+  };
+
+  const render = () => {
+    grid.style.gridTemplateColumns = `minmax(130px,1.1fr) repeat(${systems.length + 1}, minmax(150px,1fr)) 100px 56px`;
+    grid.innerHTML = '';
+    const head = (text) => {
+      const d = document.createElement('div');
+      d.className = 'vars-head';
+      d.textContent = text;
+      grid.appendChild(d);
+      return d;
     };
+    head('Variable');
+    head('Default');
+    systems.forEach(s => {
+      const d = document.createElement('div');
+      d.className = 'vars-head vars-sys' + (s.id === state.currentEnvironmentId ? ' active' : '')
+        + (PROD_ENV_RE.test(s.name) ? ' prod' : '');
+      const n = document.createElement('input');
+      n.type = 'text'; n.value = s.name; n.className = 'vars-sysname'; n.title = 'Rename this environment';
+      n.oninput = () => { s.name = n.value; };
+      n.onchange = () => { renderCerts(); render(); };
+      const x = document.createElement('button');
+      x.type = 'button'; x.className = 'remove-row'; x.textContent = '×'; x.title = 'Delete this environment and its values';
+      x.onclick = () => {
+        if (!confirm(`Delete the environment "${s.name}" and all its values?`)) return;
+        if (!s.isNew) removedSystems.push(s);
+        systems.splice(systems.indexOf(s), 1);
+        render(); renderCerts();
+      };
+      d.append(n, x);
+      grid.appendChild(d);
+    });
+    const addCol = document.createElement('div');
+    addCol.className = 'vars-head';
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button'; addBtn.className = 'add-row'; addBtn.id = 'cfgAddSystem'; addBtn.textContent = '+ Environment';
+    addBtn.onclick = () => {
+      const s = { id: crypto.randomUUID(), name: 'New environment', cert: '', key: '', orig: null, isNew: true };
+      systems.push(s);
+      rows.forEach(r => { r.envs[s.id] = ''; });
+      render(); renderCerts();
+      const names = grid.querySelectorAll('.vars-sysname');
+      const last = names[names.length - 1];
+      last.focus(); last.select();
+    };
+    addCol.appendChild(addBtn);
+    grid.appendChild(addCol);
+    head('');
+
+    rows.forEach(row => {
+      const k = document.createElement('input');
+      k.type = 'text'; k.value = row.key; k.className = 'vars-key'; k.placeholder = 'name';
+      k.oninput = () => { row.key = k.value.trim(); };
+      k.onchange = () => { row.secret = SECRET_KEY_RE.test(row.key); render(); };
+      grid.appendChild(k);
+      grid.appendChild(cell(row, null));
+      systems.forEach(s => grid.appendChild(cell(row, s.id)));
+      grid.appendChild(document.createElement('div')); // under "+ Environment"
+      const tools = document.createElement('div');
+      tools.className = 'vars-tools';
+      if (row.secret) {
+        const eye = document.createElement('button');
+        eye.type = 'button'; eye.className = 'remove-row'; eye.textContent = row.reveal ? '🙈' : '👁';
+        eye.title = row.reveal ? 'Hide values' : 'Show values';
+        eye.onclick = () => { row.reveal = !row.reveal; render(); };
+        tools.appendChild(eye);
+      }
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'remove-row'; del.textContent = '×';
+      del.title = 'Remove this variable from the collection and from each of its environments';
+      del.onclick = () => {
+        if (row.key) removedKeys.add(row.key);
+        rows.splice(rows.indexOf(row), 1);
+        render();
+      };
+      tools.appendChild(del);
+      grid.appendChild(tools);
+    });
+  };
+
+  // Brings a freshly imported environment into the draft as a column; its own
+  // variables also become rows so nothing it carries is hidden.
+  function addExistingSystem(env, addRows) {
+    const s = sysOf(env);
+    systems.push(s);
+    if (addRows) (env.values || []).forEach(kv => { if (kv.key && !rows.some(r => r.key === kv.key)) {
+      rows.push({ key: kv.key, def: '', envs: Object.fromEntries(systems.map(x => [x.id, ''])), secret: SECRET_KEY_RE.test(kv.key), reveal: false });
+    } });
+    rows.forEach(r => { const kv = findKV(env.values, r.key); r.envs[s.id] = kv ? kv.value : ''; });
+    render(); renderCerts();
   }
-  $('#envSave').onclick = async () => {
-    const payload = {
-      id: editingId || '', name: $('#envNameInput').value, values,
-      clientCertFile: $('#envClientCert').value,
-      clientKeyFile: $('#envClientKey').value,
+
+  render(); renderCerts();
+
+  $('#varsAddRow').onclick = () => {
+    rows.push({ key: '', def: '', envs: Object.fromEntries(systems.map(s => [s.id, ''])), secret: false, reveal: false });
+    render();
+    const inputs = grid.querySelectorAll('.vars-key');
+    inputs[inputs.length - 1].focus();
+  };
+
+  $('#cfgImportEnv').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const env = await api(`/environments/import?collectionId=${encodeURIComponent(col.id)}`, { method: 'POST', headers: {}, body: await file.text() });
+      state.environments.push(env);
+      addExistingSystem(env, true);
+    } catch (err) {
+      alert('Import failed: ' + err.message);
+    }
+    e.target.value = '';
+  };
+
+  const renderHeaders = () => renderKVTable('colHeadersTable', headers);
+  renderHeaders();
+  $('#colHeadersAddRow').onclick = () => { headers.push({ key: '', value: '', disabled: false }); renderHeaders(); };
+
+  const rerenderAuth = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerenderAuth);
+  $('#colAuthType').value = auth.type;
+  rerenderAuth();
+  $('#colAuthType').onchange = (e) => { auth.type = e.target.value; rerenderAuth(); };
+
+  $('#cfgCancel').onclick = closeModal;
+  $('#cfgSave').onclick = async () => {
+    const live = rows.filter(r => r.key);
+    const dupKey = live.map(r => r.key).find((k, i, a) => a.indexOf(k) !== i);
+    if (dupKey) { alert(`"${dupKey}" appears twice — variable names must be unique.`); return; }
+    const names = systems.map(s => s.name.trim());
+    if (names.some(n => !n)) { alert('Every environment needs a name.'); return; }
+    const dupName = names.find((n, i) => names.indexOf(n) !== i);
+    if (dupName) { alert(`Two environments are called "${dupName}" — names must be unique.`); return; }
+    const liveKeys = new Set(live.map(r => r.key));
+
+    // Rebuild a KV list: entries the grid doesn't manage are kept untouched
+    // (including their disabled flag); managed ones take the grid's value.
+    const rebuild = (orig, valueOf) => {
+      const out = (orig || []).filter(kv => !liveKeys.has(kv.key) && !removedKeys.has(kv.key));
+      live.forEach(r => {
+        const v = valueOf(r);
+        if (v === '') return;
+        const prev = findKV(orig, r.key);
+        out.push(Object.assign({}, prev || { disabled: false }, { key: r.key, value: v }));
+      });
+      return out;
     };
-    const saved = editingId
-      ? await api(`/environments/${editingId}`, { method: 'PUT', body: JSON.stringify(payload) })
-      : await api(`/environments/${crypto.randomUUID()}`, { method: 'PUT', body: JSON.stringify(payload) });
-    await loadEnvironments();
-    $('#envSelect').value = saved.id;
-    state.currentEnvironmentId = saved.id;
-    closeModal();
+    try {
+      col.variables = rebuild(col.variables, r => r.def);
+      col.headers = headers;
+      col.auth = auth;
+      const saved = await api(`/collections/${col.id}`, { method: 'PUT', body: JSON.stringify(col) });
+      if (state.currentCollection && state.currentCollection.id === col.id) state.currentCollection = saved;
+
+      for (const s of removedSystems) await api(`/environments/${s.id}`, { method: 'DELETE' });
+      for (const s of systems) {
+        const payload = Object.assign({}, s.orig || {}, {
+          id: s.id, collectionId: col.id, name: s.name.trim(),
+          values: rebuild(s.orig && s.orig.values, r => r.envs[s.id]),
+          clientCertFile: s.cert, clientKeyFile: s.key,
+        });
+        if (!s.isNew && JSON.stringify(payload) === JSON.stringify(s.orig)) continue;
+        await api(`/environments/${s.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      }
+      if (removedSystems.some(s => s.id === state.currentEnvironmentId)) setActiveEnv('');
+      await loadEnvironments();
+      closeModal();
+    } catch (err) {
+      alert('Saving failed: ' + (err && err.message ? err.message : err));
+    }
   };
 }
 
@@ -1704,8 +1964,7 @@ async function loadHistoryEntry(entry) {
     }
   }
   if (entry.environmentId && state.environments.some(e => e.id === entry.environmentId)) {
-    state.currentEnvironmentId = entry.environmentId;
-    $('#envSelect').value = entry.environmentId;
+    setActiveEnv(entry.environmentId);
   }
   state.selectedPath = null; // not tied to a saved tree node — Send works, Save needs a node picked first
   renderCollectionList();
@@ -2396,7 +2655,8 @@ function downloadJson(data, filename) {
 async function exportCollection(id, name) {
   let col;
   try {
-    col = await api(`/collections/${id}`);
+    // Bundles the collection's environments, credentials blanked.
+    col = await api(`/collections/${id}/export`);
   } catch (e) {
     alert('Export failed: ' + e.message);
     return;
@@ -2417,21 +2677,6 @@ async function exportCollectionPostman(id, name) {
     return;
   }
   downloadJson(col, (name || 'collection').replace(/[\\/:*?"<>|]/g, '_') + '.postman_collection.json');
-}
-
-// Same idea as exportCollection — internal/importer.ImportEnvironment
-// recognizes this shape by the presence of "updatedAt" (every hapidays
-// environment has it; a Postman export never does) and reassigns a fresh
-// ID on the way back in.
-async function exportEnvironment(id, name) {
-  let env;
-  try {
-    env = await api(`/environments/${id}`);
-  } catch (e) {
-    alert('Export failed: ' + e.message);
-    return;
-  }
-  downloadJson(env, (name || 'environment').replace(/[\\/:*?"<>|]/g, '_') + '.hapidays.json');
 }
 
 // ---------- import ----------
@@ -2469,7 +2714,7 @@ function openImportURLModal(endpoint, onDone, opts) {
     const url = $('#importUrlInput').value.trim();
     if (!url) return;
     try {
-      await api(endpoint, { method: 'POST', body: JSON.stringify({ url }) });
+      await api(endpoint, { method: 'POST', body: JSON.stringify(Object.assign({ url }, opts.extra ? opts.extra() : {})) });
       await onDone();
       closeModal();
     } catch (e) {
@@ -2496,7 +2741,7 @@ function openHelpModal() {
       <a href="#help-auth">Auth</a>
       <a href="#help-capassert">Captures &amp; assertions</a>
       <a href="#help-collections">Collections</a>
-      <a href="#help-environments">Environments</a>
+      <a href="#help-environments">Environments &amp; Configure</a>
       <a href="#help-running">Sending &amp; running</a>
       <a href="#help-history">History</a>
       <a href="#help-evidence">Test evidence</a>
@@ -2508,13 +2753,15 @@ function openHelpModal() {
 
     <div id="help-model" class="help-eyebrow">Model</div>
     <h4>Collections vs. environments</h4>
-    <p class="hint">A collection is the <em>shape</em> of an API: its requests, the headers/variables it always
-    sends, and the shape of its auth (which type, which header/query param carries it). An environment is the
-    <em>values</em> that differ per target, or are sensitive — host, port, tenant URL, and every credential
-    (password, token, API key, client secret). A credential should always be a <code>{{var}}</code> referencing
-    an environment, never a literal typed into the collection — collections are the thing you export/share,
-    environments are the thing you don't. Switching between Dev/QA/Prod should just mean switching the
-    environment; nothing about the collection itself should need to change.</p>
+    <p class="hint">A collection is one API: its requests, plus the headers, variables and auth every request
+    shares. Each collection has its own <strong>environments</strong> — the systems it can be pointed at (Dev, QAS,
+    PRD…) — and an environment only holds the values that differ per system: normally the host, and credentials.
+    Set a collection up once against one system, then switch to another and fill in just what differs; nothing
+    about the requests changes. CPI's Dev/QAS/PRD belong to CPI, and a collection that only talks to one system
+    simply has no environments. Credentials should be a <code>{{var}}</code> (e.g. <code>{{password}}</code>) whose
+    value lives in an environment, never a literal typed into the collection.</p>
+    <p class="hint">Two controls, that's all: the <strong>pills</strong> in the top bar switch the active
+    environment, and <strong>⚙ Configure</strong> sets the collection up.</p>
 
     <div id="help-request" class="help-eyebrow">Requests</div>
     <h4>Building a request</h4>
@@ -2576,24 +2823,42 @@ function openHelpModal() {
     <p class="hint">A tree of folders and requests. The <strong>New</strong> menu creates a request/folder/
     collection by hand, or imports one: a Postman collection file, WSDL (SOAP), OData <code>$metadata</code>,
     GraphQL introspection, gRPC server reflection, an <strong>OpenAPI 3.0/3.1 or Swagger 2.0</strong> document
-    (JSON or YAML — generates a folder per tag, one request per operation, and a matching Environment per
-    server the spec declares), a pasted curl command, or <strong>Import from URL</strong> — fetches a hapidays
+    (JSON or YAML — generates a folder per tag, one request per operation, and a matching environment per
+    server the spec declares, attached to the new collection), a pasted curl command, or <strong>Import from URL</strong> — fetches a hapidays
     or Postman file from any reachable link, server-side, the same mechanism WSDL-by-URL import uses (so a
     shared example doesn't need downloading by hand first).</p>
-    <p class="hint">The <strong>⚙</strong> icon on a collection opens its settings — Headers and Variables sent
-    by default to every request in it (a request can override a header by declaring one with the same name), and
-    the collection's own Auth. <strong>⬇</strong> exports it as hapidays's native JSON (round-trips losslessly,
-    re-importable on this machine or another); <strong>⬇P</strong> exports it as a Postman v2.1 file instead,
-    best-effort — SOAP/gRPC bodies fall back to raw XML/JSON since Postman has no equivalent mode, and
-    hapidays's own collection-level Headers have no Postman equivalent so they're dropped on that path only.</p>
+    <p class="hint">The <strong>⚙</strong> icon on a collection (or <strong>Configure</strong> in the top bar) opens
+    its setup — see Environments below. <strong>⬇</strong> exports it as hapidays's native JSON, including its
+    environments with credential values blanked (round-trips losslessly, re-importable on this machine or
+    another); <strong>⬇P</strong> exports it as a Postman v2.1 file instead, best-effort — SOAP/gRPC bodies fall back
+    to raw XML/JSON since Postman has no equivalent mode, and hapidays's own collection-level Headers and its
+    environments have no Postman equivalent so they're dropped on that path only.</p>
 
     <div id="help-environments" class="help-eyebrow">Organizing</div>
-    <h4>Environments</h4>
-    <p class="hint">A named set of variable values, plus an optional mTLS client cert/key override for when one
-    environment (e.g. prod) needs a different client identity than the one configured globally in Settings. The
-    dropdown in the sidebar switches the active one; <strong>Duplicate</strong> (when editing an existing
-    environment) starts a new one pre-filled with the same variables — the fast way to build a Test environment
-    out of Dev without retyping everything. Import/Export mirror the collection versions (file or URL).</p>
+    <h4>Environments &amp; Configure</h4>
+    <p class="hint">The <strong>pills</strong> in the top bar (None · Dev · QAS · PRD…) show the open collection's
+    environments; click one and the next Send, Run or Batch uses it. The choice is remembered per collection, so
+    opening another collection doesn't carry the last one over. A name starting prod/prd/production/live turns red as
+    a reminder that the next Send is real.</p>
+    <p class="hint"><strong>⚙ Configure</strong> (top bar, or the ⚙ on the collection in the sidebar) is the one place
+    to set a collection up:</p>
+    <dl class="help-dl">
+      <dt>Variables grid</dt><dd>One row per variable, one column for <strong>Default</strong> (used by every environment)
+        and one per environment. Rows are pre-filled with every <code>{{var}}</code> the collection's requests, headers and
+        auth use. Fill in Default once, then only what differs per environment; a blank cell falls back to Default
+        (shown greyed), and a red cell means the active environment has no value at all. Password/token/secret/API-key
+        rows are masked, with an eye to reveal.</dd>
+      <dt>Environments</dt><dd>Add one with <strong>+ Environment</strong> at the end of the header row, rename it in its
+        header, delete it with its ×. <strong>Import a Postman environment…</strong> adds a Postman or hapidays environment file
+        as a new column.</dd>
+      <dt>Headers</dt><dd>Sent on every request in the collection; a request overrides one by declaring the same name.</dd>
+      <dt>Auth</dt><dd>Used by requests set to "Inherit from collection". Keep the secret in a variable so it can differ
+        per environment.</dd>
+      <dt>Advanced</dt><dd>A closed section for an optional mTLS client cert/key per environment, for a system that needs a
+        different client identity than the global one in Settings. Blank uses the global cert.</dd>
+    </dl>
+    <p class="hint">Nothing is written until <strong>Save</strong>. Values captured from responses (Capture rules) are
+    written into the active environment.</p>
 
     <div id="help-running" class="help-eyebrow">Executing</div>
     <h4>Sending &amp; running</h4>
@@ -2654,7 +2919,7 @@ function openHelpModal() {
     <div id="help-settings" class="help-eyebrow">Configuration</div>
     <h4>Settings &amp; network</h4>
     <p class="hint">Global, machine-wide config (the gear icon): a client cert/key pair for mutual TLS (a per-
-    environment override is available for when one target needs a different identity), an extra CA bundle for
+    environment override is available under Configure → Advanced for when one target needs a different identity), an extra CA bundle for
     internal/self-signed chains, an HTTP(S) proxy URL, and a skip-TLS-verification override for the "I know this
     cert is bad, let me through anyway" case — flagged with a persistent warning dot on the gear icon while it's
     on, so it's hard to leave enabled by accident.</p>
@@ -2662,7 +2927,7 @@ function openHelpModal() {
     <div id="help-palette" class="help-eyebrow">Configuration</div>
     <h4>Command palette (⌘K)</h4>
     <p class="hint">Searches everything — every request across every collection (including inside collapsed
-    folders, unlike the sidebar filter box), plus actions like switching environments — and jumps straight to
+    folders, unlike the sidebar filter box), plus actions like switching the open collection's environment — and jumps straight to
     it. The sidebar filter box only searches the currently open collection's visible tree; ⌘K is for "I know
     what I'm looking for, I don't know where it is."</p>
 
@@ -2841,8 +3106,8 @@ function openOpenAPIImportModal() {
     <h3>Import OpenAPI / Swagger</h3>
     <p class="hint">Accepts OpenAPI 3.0/3.1 or Swagger 2.0, JSON or YAML. Generates one request per operation,
     grouped into folders by tag, with example values filled in from the spec's schemas — and, since a spec
-    describes its own auth, a matching Environment per server it declares (with placeholder credential values;
-    see the Help panel's "Collections vs. environments" section for why those aren't collection variables).</p>
+    describes its own auth, a matching environment per server it declares, owned by the new collection (with placeholder credential
+    values; see the Help panel's "Collections vs. environments" section for why those aren't collection variables).</p>
     <div class="field-row"><label>Spec URL</label><input type="text" id="openapiUrlInput" placeholder="https://host/openapi.json"></div>
     <label>Auth (only needed if the service gates the spec document itself)</label>
     <select id="openapiAuthType">
@@ -3066,7 +3331,7 @@ async function buildPaletteIndex() {
     };
     walk(col.root, [], [col.name], []);
   });
-  state.environments.forEach(env => items.push({ type: 'env', label: env.name, sub: 'Switch environment', envId: env.id }));
+  visibleEnvs().forEach(env => items.push({ type: 'env', label: env.name, sub: 'Switch environment', envId: env.id }));
   items.push({ type: 'action', label: 'New collection', sub: 'Action', run: () => $('#newCollectionBtn').click() });
   items.push({ type: 'action', label: 'Cookie jar', sub: 'Action', run: openCookiesModal });
   items.push({ type: 'action', label: 'Settings', sub: 'Action', run: openSettings });
@@ -3103,8 +3368,7 @@ async function openPaletteItem(item) {
     item.ancestorFolderIds.forEach(id => state.expandedFolders.add(id));
     selectRequest(item.nodePath);
   } else if (item.type === 'env') {
-    state.currentEnvironmentId = item.envId;
-    $('#envSelect').value = item.envId;
+    setActiveEnv(item.envId);
   } else if (item.type === 'action') {
     item.run();
   }
@@ -3184,7 +3448,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#pathInput').oninput = composeUrlFromFields;
 
   $('#importCollectionBtn').onclick = () => $('#importCollectionInput').click();
-  $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', loadCollections);
+  $('#importCollectionInput').onchange = (e) => importFile(e.target, '/collections/import', async () => { await loadCollections(); await loadEnvironments(); });
   $('#importWsdlBtn').onclick = openWsdlImportModal;
   $('#importODataBtn').onclick = openODataImportModal;
   $('#importOpenAPIBtn').onclick = openOpenAPIImportModal;
@@ -3192,24 +3456,12 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#importGRPCBtn').onclick = openGRPCImportModal;
   $('#importCurlBtn').onclick = openCurlImportModal;
   $('#copyAsCurlBtn').onclick = openCurlExportModal;
-  $('#importCollectionUrlBtn').onclick = () => openImportURLModal('/collections/import-url', loadCollections, {
+  $('#importCollectionUrlBtn').onclick = () => openImportURLModal('/collections/import-url', async () => { await loadCollections(); await loadEnvironments(); }, {
     title: 'Import collection from URL',
-  });
-
-  $('#importEnvBtn').onclick = () => $('#importEnvInput').click();
-  $('#importEnvInput').onchange = (e) => importFile(e.target, '/environments/import', loadEnvironments);
-  $('#importEnvUrlBtn').onclick = () => openImportURLModal('/environments/import-url', loadEnvironments, {
-    title: 'Import environment from URL',
   });
 
   $('#helpBtn').onclick = openHelpModal;
 
-  $('#editEnvBtn').onclick = openEnvEditor;
-  $('#exportEnvBtn').onclick = () => {
-    if (!state.currentEnvironmentId) { alert('Select an environment first.'); return; }
-    const env = state.environments.find(e => e.id === state.currentEnvironmentId);
-    exportEnvironment(state.currentEnvironmentId, env && env.name);
-  };
   $('#settingsBtn').onclick = openSettings;
   $('#cookiesBtn').onclick = openCookiesModal;
   $('#suggestCapturesBtn').onclick = runSuggestCaptures;
@@ -3226,7 +3478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  $('#envSelect').onchange = (e) => { state.currentEnvironmentId = e.target.value; saveUiState(); };
+  $('#configureBtn').onclick = () => { if (currentCollectionId()) openConfigure(currentCollectionId()); };
 
   $$('#requestTabs .tab').forEach(tab => {
     tab.onclick = () => {

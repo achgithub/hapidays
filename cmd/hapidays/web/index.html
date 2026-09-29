@@ -77,30 +77,15 @@
       <div id="historyList" class="history-list hidden"></div>
     </div>
 
-    <div class="util-rail">
-      <div class="util-row-label">
-        <span>Environment</span>
-      </div>
-      <input id="importEnvInput" type="file" accept=".json" hidden>
-      <div class="env-row">
-        <select id="envSelect" class="env-select"><option value="">No environment</option></select>
-        <button id="importEnvBtn" class="icon-btn bordered" title="Import a Postman or hapidays environment file" aria-label="Import environment">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V9m0 0-4 4m4-4 4 4M5 3h14"/></svg>
-        </button>
-        <button id="importEnvUrlBtn" class="icon-btn bordered" title="Import an environment from a URL" aria-label="Import environment from URL">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-        </button>
-        <button id="exportEnvBtn" class="icon-btn bordered" title="Export the selected environment as a hapidays file" aria-label="Export environment">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
-        </button>
-        <button id="editEnvBtn" class="icon-btn bordered" title="Edit variables" aria-label="Edit environment variables">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        </button>
-      </div>
-    </div>
   </aside>
 
   <main class="main">
+    <div class="env-bar" id="envBar">
+      <span class="env-bar-label">Environment</span>
+      <div class="env-pills" id="envPills" role="tablist" aria-label="Active environment"></div>
+      <div class="spacer"></div>
+      <button id="configureBtn" class="env-vars-btn" title="Set up this collection: variables and systems (Dev, QAS, PRD…), headers and auth">⚙ Configure</button>
+    </div>
     <div class="crumb-bar" id="crumbBar">
       <span id="crumbText">No request selected</span>
       <span class="dirty-dot hidden" id="dirtyDot" title="Unsaved changes"></span>

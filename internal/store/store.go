@@ -198,6 +198,23 @@ func (s *Store) DeleteEnvironment(id string) error {
 	return os.Remove(filepath.Join(s.dir, "environments", id+".json"))
 }
 
+// DeleteEnvironmentsForCollection removes every environment the collection
+// owns — they have no meaning without it.
+func (s *Store) DeleteEnvironmentsForCollection(collectionID string) error {
+	envs, err := s.ListEnvironments()
+	if err != nil {
+		return err
+	}
+	for _, e := range envs {
+		if e.CollectionID == collectionID {
+			if err := s.DeleteEnvironment(e.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Store) ListEnvironments() ([]*model.Environment, error) {
 	return listDir[model.Environment](filepath.Join(s.dir, "environments"))
 }
