@@ -513,3 +513,11 @@ details.adv summary { cursor: pointer; }
 .cert-box { display: flex; flex-direction: column; gap: 4px; }
 .cert-row { display: grid; grid-template-columns: 110px 1fr 1fr; gap: 6px; align-items: center; }
 .cert-row input { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: ui-monospace, monospace; font-size: 12px; min-width: 0; }
+
+.var-warning {
+  margin-top: 6px; padding: 5px 9px; border-radius: 6px; font-size: 12px;
+  color: var(--danger); background: var(--danger-wash); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  word-break: break-word;
+}
+.var-warning a { color: inherit; text-decoration: underline; cursor: pointer; }
+.var-warning.hidden { display: none; }

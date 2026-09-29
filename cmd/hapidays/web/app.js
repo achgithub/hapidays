@@ -509,6 +509,7 @@ function loadRequestIntoForm(req) {
   lastSavedSnapshot = JSON.stringify(currentRequest);
   $('#dirtyDot').classList.add('hidden');
   updateCrumb();
+  updateVarWarning();
 }
 
 // ---------- URL bar: Protocol / Domain / Port / Path fields ----------
@@ -567,6 +568,51 @@ function composeUrlFromFields() {
   url += path;
   currentRequest.urlRaw = url;
   refreshFullUrlPreview();
+}
+
+// Warns, before Send, about {{variables}} the open request needs that neither
+// the collection nor the active environment gives a value — the usual
+// symptom of switching to a system whose host or credentials weren't filled
+// in yet. Advisory only: a variable can still be supplied at run time by a
+// pre-request script or a data file. Variables that some request in the
+// collection captures into are excluded — they get their value from a
+// response, so being empty beforehand is expected.
+function capturedVarNames(nodes, out) {
+  (nodes || []).forEach(n => {
+    if (n.request) (n.request.captures || []).forEach(c => { if (c.intoVar) out.add(c.intoVar); });
+    capturedVarNames(n.children, out);
+  });
+  return out;
+}
+
+function unresolvedVars() {
+  const col = state.currentCollection;
+  if (!col || !currentRequest) return [];
+  const used = scanVars(currentRequest, new Set());
+  scanVars(col.headers || [], used);
+  if (currentRequest.auth && currentRequest.auth.type === 'inherit') scanVars(col.auth || {}, used);
+  const defined = capturedVarNames(col.root, new Set());
+  const add = list => (list || []).forEach(kv => { if (kv.key && !kv.disabled && kv.value !== '') defined.add(kv.key); });
+  add(col.variables);
+  const env = state.environments.find(e => e.id === state.currentEnvironmentId);
+  if (env) add(env.values);
+  return Array.from(used).filter(v => !defined.has(v));
+}
+
+function updateVarWarning() {
+  const box = $('#varWarning');
+  if (!box) return;
+  const missing = unresolvedVars();
+  if (!missing.length) { box.classList.add('hidden'); box.textContent = ''; return; }
+  const env = state.environments.find(e => e.id === state.currentEnvironmentId);
+  const list = missing.map(v => '{{' + v + '}}').join(', ');
+  box.classList.remove('hidden');
+  box.innerHTML = '';
+  box.append(`⚠ No value for ${list} ${env ? 'in ' + env.name : 'in this collection'} — `);
+  const link = document.createElement('a');
+  link.href = '#'; link.textContent = 'set it in Configure';
+  link.onclick = (e) => { e.preventDefault(); openConfigure(state.currentCollection.id); };
+  box.appendChild(link);
 }
 
 function refreshFullUrlPreview() {
@@ -788,6 +834,7 @@ function updateCrumb() {
 // render (kv-tables rebuild their DOM on every change).
 function onWorkspaceChanged() {
   collectFormIntoRequest();
+  updateVarWarning();
   const dirty = lastSavedSnapshot !== null && JSON.stringify(currentRequest) !== lastSavedSnapshot;
   $('#dirtyDot').classList.toggle('hidden', !dirty);
   updateTabBadges();
@@ -1580,6 +1627,7 @@ function renderEnvBar() {
   }
   box.innerHTML = '';
   $('#configureBtn').disabled = !cid;
+  updateVarWarning();
   if (!cid) {
     const hint = document.createElement('span');
     hint.className = 'env-bar-empty';
@@ -1881,7 +1929,28 @@ async function openConfigure(collectionId) {
   const rerenderAuth = () => populateAuthFields(auth.type, auth.params, $('#colAuthFields'), rerenderAuth);
   $('#colAuthType').value = auth.type;
   rerenderAuth();
-  $('#colAuthType').onchange = (e) => { auth.type = e.target.value; rerenderAuth(); };
+  // Picking an auth type that carries credentials pre-fills them with
+  // {{variables}} and adds those to the grid, so the secret is set per
+  // environment from the start instead of being typed into the collection.
+  const AUTH_VARS = {
+    basic: { username: 'username', password: 'password' },
+    digest: { username: 'username', password: 'password' },
+    bearer: { token: 'token' },
+    apikey: { value: 'apiKey' },
+  };
+  $('#colAuthType').onchange = (e) => {
+    auth.type = e.target.value;
+    Object.entries(AUTH_VARS[auth.type] || {}).forEach(([param, name]) => {
+      if (!auth.params[param]) auth.params[param] = '{{' + name + '}}';
+    });
+    rerenderAuth();
+    scanVars(auth.params, new Set()).forEach(name => {
+      if (!rows.some(r => r.key === name)) {
+        rows.push({ key: name, def: '', envs: Object.fromEntries(systems.map(x => [x.id, ''])), secret: SECRET_KEY_RE.test(name), reveal: false });
+      }
+    });
+    render();
+  };
 
   $('#cfgCancel').onclick = closeModal;
   $('#cfgSave').onclick = async () => {
@@ -2852,11 +2921,16 @@ function openHelpModal() {
         header, delete it with its ×. <strong>Import a Postman environment…</strong> adds a Postman or hapidays environment file
         as a new column.</dd>
       <dt>Headers</dt><dd>Sent on every request in the collection; a request overrides one by declaring the same name.</dd>
-      <dt>Auth</dt><dd>Used by requests set to "Inherit from collection". Keep the secret in a variable so it can differ
-        per environment.</dd>
+      <dt>Auth</dt><dd>Used by requests set to "Inherit from collection". Choosing Basic, Digest, Bearer or API Key pre-fills the
+        credential fields with <code>{{username}}</code>/<code>{{password}}</code> (or <code>{{token}}</code>,
+        <code>{{apiKey}}</code>) and adds those rows to the grid, so the secret is set per environment.</dd>
       <dt>Advanced</dt><dd>A closed section for an optional mTLS client cert/key per environment, for a system that needs a
         different client identity than the global one in Settings. Blank uses the global cert.</dd>
     </dl>
+    <p class="hint">If the open request uses a <code>{{variable}}</code> that neither the collection nor the active
+    environment has a value for — typically after switching to an environment that isn't filled in yet — a red
+    warning under the URL names it, with a link to Configure. It's advisory (a script or data file can still supply
+    a value at run time), and variables that a Capture rule fills from a response are left out.</p>
     <p class="hint">Nothing is written until <strong>Save</strong>. Values captured from responses (Capture rules) are
     written into the active environment.</p>
 
